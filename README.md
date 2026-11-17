@@ -1,6 +1,6 @@
 # Xếp Việc
 
-Ứng dụng quản lý công việc kiểu bảng Kanban (lấy cảm hứng từ Jira), thiết kế đơn giản để người ở mọi lứa tuổi đều dùng được ngay. Chỉ gồm **một tệp HTML**, không cần cài đặt, không cần máy chủ.
+Ứng dụng quản lý công việc kiểu bảng Kanban, thiết kế đơn giản để người ở mọi lứa tuổi đều dùng được ngay. Chỉ gồm **một tệp HTML**, không cần cài đặt, không cần máy chủ.
 
 ## Tính năng
 
