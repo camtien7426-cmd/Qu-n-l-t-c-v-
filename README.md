@@ -36,13 +36,6 @@ python3 -m http.server 8000
 
 Sau đó mở http://localhost:8000.
 
-## Đưa lên GitHub Pages
-
-1. Tạo repository mới trên GitHub, ví dụ `xep-viec`.
-2. Tải lên các tệp `index.html`, `README.md` và `LICENSE`.
-3. Vào **Settings** > **Pages**.
-4. Ở mục **Build and deployment**, chọn **Deploy from a branch**, chọn nhánh `main` và thư mục `/ (root)`, rồi bấm **Save**.
-5. Chờ khoảng một phút, trang sẽ có địa chỉ `https://<ten-ban>.github.io/xep-viec/`.
 
 ## Cấu trúc dự án
 
@@ -60,10 +53,6 @@ xep-viec/
 - **Lời chào:** sửa các mảng chuỗi trong biến `greet`.
 - **Khóa lưu trữ:** dữ liệu nằm ở khóa `xepviec.tasks.v1` trong `localStorage`. Đổi tên khóa nếu bạn muốn bắt đầu với danh sách trống.
 
-## Lưu ý
-
-- Dữ liệu chỉ nằm trong trình duyệt của bạn. Nếu xóa dữ liệu duyệt web hoặc đổi thiết bị, danh sách việc sẽ không đi theo.
-- Kéo thả dùng HTML5 Drag and Drop nên hoạt động tốt với chuột trên máy tính. Nhiều trình duyệt trên điện thoại chưa hỗ trợ kiểu kéo này.
 
 ## Hướng phát triển
 
@@ -73,6 +62,3 @@ xep-viec/
 - [ ] Nhãn màu tự đặt
 - [ ] Đăng nhập và đồng bộ giữa các thiết bị
 
-## Giấy phép
-
-Phát hành theo giấy phép [MIT](LICENSE).
