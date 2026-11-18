@@ -62,3 +62,53 @@ xep-viec/
 - [ ] Nhãn màu tự đặt
 - [ ] Đăng nhập và đồng bộ giữa các thiết bị
 
+Markdown
+---
+
+## Hướng dẫn cài đặt & chạy dự án (TaskFlow)
+
+### 1. Yêu cầu môi trường
+- **Node.js**: Phiên bản `18.x` hoặc `20.x LTS` trở lên.
+- **Database**: Đã cài đặt và khởi chạy dịch vụ **PostgreSQL** trên máy.
+
+### 2. Cài đặt thư viện (Dependencies)
+Mở 2 cửa sổ Terminal riêng biệt và cài đặt các gói thư viện cho cả Backend lẫn Frontend:
+
+```bash
+# Terminal 1 - Cài đặt cho Server
+cd server
+npm install
+
+# Terminal 2 - Cài đặt cho Client
+cd client
+npm install
+3. Cấu hình biến môi trường (.env)
+Tạo một file mới tên là .env nằm bên trong thư mục server/ (server/.env).
+
+    Dán nội dung sau vào file và thay mat_khau_cua_ban bằng mật khẩu tài khoản postgres trên máy của bạn:
+
+DATABASE_URL="postgresql://postgres:mat_khau_cua_ban@localhost:5432/taskflow?schema=public"
+
+4. Khởi tạo Database (Prisma)
+Tại Terminal của thư mục server/, chạy lệnh sau để đồng bộ cấu trúc bảng vào PostgreSQL:
+
+Bash
+cd server
+npx prisma migrate dev
+npx prisma generate
+(Nếu dự án có file dữ liệu mẫu, chạy thêm npx prisma db seed để tạo dữ liệu test).
+
+5. Khởi chạy ứng dụng
+Chạy song song cả 2 server trên 2 cửa sổ Terminal:
+
+Khởi chạy Backend (Server):
+
+Bash
+cd server
+npm run dev
+Khởi chạy Frontend (Client):
+
+Bash
+cd client
+npm run dev
+
