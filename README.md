@@ -1,58 +1,64 @@
-# TaskFlow
+# Xếp Việc
 
-Website quản lý công việc và dự án nhóm cho sinh viên.
-Công nghệ: React + Vite + Tailwind CSS, Node.js + Express, PostgreSQL + Prisma.
+Ứng dụng quản lý công việc kiểu bảng Kanban, thiết kế đơn giản để người ở mọi lứa tuổi đều dùng được ngay. Chỉ gồm **một tệp HTML**, không cần cài đặt, không cần máy chủ.
 
-## Cấu trúc
+## Tính năng
 
-```
-taskflow/
-├── client/   # Frontend (React + Vite)
-└── server/   # Backend (Express + Prisma)
-```
+- Bảng ba cột: **Cần làm**, **Đang làm**, **Đã xong**
+- Kéo thả thẻ việc giữa các cột
+- Thêm, sửa, xóa công việc kèm ghi chú
+- Ba mức độ quan trọng: Gấp, Vừa, Thong thả (hiển thị bằng màu viền thẻ)
+- Đặt hạn hoàn thành, tự cảnh báo khi quá hạn hoặc đến hạn hôm nay
+- Bấm vòng tròn trên thẻ để đánh dấu đã xong
+- Thanh tiến độ tổng quan
+- Tìm kiếm và lọc theo mức độ quan trọng
+- Lời chào ngẫu nhiên, đổi theo tình hình công việc (có việc trễ hạn, đã xong hết, làm việc khuya…)
+- Nền động dạng cực quang, tự đổi tông màu theo chế độ sáng/tối của thiết bị
+- Tự lưu dữ liệu trên trình duyệt (`localStorage`), mở lại vẫn còn
+- Tôn trọng cài đặt giảm chuyển động của hệ thống (`prefers-reduced-motion`)
 
-## Chạy thử (bước 1)
+## Công nghệ
 
-Yêu cầu: Node.js >= 18.11 và PostgreSQL đã cài sẵn.
+- HTML, CSS, JavaScript thuần (không framework, không thư viện)
+- Phông chữ [Lexend](https://fonts.google.com/specimen/Lexend) và [Be Vietnam Pro](https://fonts.google.com/specimen/Be+Vietnam+Pro) từ Google Fonts
 
-### 1. Tạo database
+## Chạy trên máy
 
-Dùng pgAdmin hoặc psql:
+Cách nhanh nhất: tải về và mở tệp `index.html` bằng trình duyệt.
 
-```sql
-CREATE DATABASE taskflow;
-```
-
-### 2. Chạy backend
-
-```bash
-cd server
-cp .env.example .env        # Windows: copy .env.example .env
-# Mở .env, sửa DATABASE_URL (user, mật khẩu, tên database) cho đúng máy bạn
-npm install
-npx prisma migrate dev --name init
-npm run dev
-```
-
-Kiểm tra: mở http://localhost:5000/api/health, kết quả đúng là
-`{"server":"ok","database":"ok"}`.
-
-### 3. Chạy frontend
-
-Mở terminal thứ hai:
+Hoặc chạy bằng máy chủ cục bộ:
 
 ```bash
-cd client
-npm install
-npm run dev
+git clone https://github.com/<ten-ban>/xep-viec.git
+cd xep-viec
+python3 -m http.server 8000
 ```
 
-Mở http://localhost:5173, sẽ thấy "TaskFlow" và dòng
-"Kết nối backend và cơ sở dữ liệu: thành công".
+Sau đó mở http://localhost:8000.
 
-### Xem dữ liệu trong database (tùy chọn)
 
-```bash
-cd server
-npm run prisma:studio
+## Cấu trúc dự án
+
 ```
+xep-viec/
+├── index.html   # Toàn bộ giao diện, kiểu dáng và logic
+├── README.md
+└── LICENSE
+```
+
+## Tùy chỉnh
+
+- **Màu sắc:** sửa các biến CSS ở đầu thẻ `<style>` (`--b1` đến `--b4` là bốn mảng màu nền, `--accent` là màu nút chính). Có hai bộ biến: sáng và tối.
+- **Tên cột:** sửa mảng `COLS` trong phần `<script>`.
+- **Lời chào:** sửa các mảng chuỗi trong biến `greet`.
+- **Khóa lưu trữ:** dữ liệu nằm ở khóa `xepviec.tasks.v1` trong `localStorage`. Đổi tên khóa nếu bạn muốn bắt đầu với danh sách trống.
+
+
+## Hướng phát triển
+
+- [ ] Kéo thả bằng cảm ứng trên điện thoại
+- [ ] Sao lưu và khôi phục dữ liệu bằng tệp
+- [ ] Nhiều bảng dự án
+- [ ] Nhãn màu tự đặt
+- [ ] Đăng nhập và đồng bộ giữa các thiết bị
+
