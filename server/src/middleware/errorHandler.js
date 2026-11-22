@@ -1,7 +1,7 @@
 import { isDev } from "../config/env.js";
 
 export function notFound(req, res) {
-  res.status(404).json({ message: "Không tìm thấy đường dẫn yêu cầu." });
+  res.status(404).json({ error: "Không tìm thấy đường dẫn yêu cầu." });
 }
 
 // Không làm lộ thông tin kỹ thuật nhạy cảm ra ngoài (mục 3.3 của đặc tả)
