@@ -113,7 +113,77 @@ Giá trị `role` trong dự án: `"LEADER"` | `"MEMBER"` (mỗi dự án chỉ 
   ]
 }
 ```
+### Tạo dự án mới (`POST /api/projects`)
+- Quyền hạn: Yêu cầu đăng nhập (`requireAuth`). Người tạo tự động trở thành `LEADER` của dự án.
+- Request Body:
+  ```json
+  {
+    "name": "Ứng dụng quản lý tác vụ TaskFlow",
+    "description": "Đồ án môn Công nghệ phần mềm",
+    "deadline": "2026-12-15T23:59:59.000Z"
+  }
+  ```
+  *(Trường `description` và `deadline` có thể bỏ trống hoặc truyền `null`).*
+Response thành công (`201 Created`):
+  ```json
+  {
+    "message": "Tạo dự án thành công!",
+    "project": {
+      "id": 1,
+      "name": "Ứng dụng quản lý tác vụ TaskFlow",
+      "description": "Đồ án môn Công nghệ phần mềm",
+      "deadline": "2026-12-15T23:59:59.000Z",
+      "createdAt": "2026-11-22T15:10:00.000Z",
+      "updatedAt": "2026-11-22T15:10:00.000Z",
+      "members": [
+        {
+          "projectId": 1,
+          "userId": 1,
+          "role": "LEADER",
+          "joinedAt": "2026-11-22T15:10:00.000Z",
+          "user": {
+            "id": 1,
+            "name": "Nguyễn Thị Anh Thư",
+            "email": "anhthu@example.com",
+            "avatarUrl": null
+          }
+        }
+      ],
+      "_count": {
+        "tasks": 0
+      }
+    }
+  }
+  ```
 
+### Cập nhật thông tin dự án (`PUT /api/projects/:id`)
+- Quyền hạn: Yêu cầu đăng nhập (`requireAuth`), là thành viên dự án (`requireProjectMember`) và phải là Trưởng nhóm (`requireLeader`).
+- Request Body (truyền các trường cần sửa; truyền `deadline: null` nếu muốn xóa thời hạn):
+  ```json
+  {
+    "name": "Tên dự án đã cập nhật",
+    "description": "Mô tả mới",
+    "deadline": "2026-12-20T23:59:59.000Z"
+  }
+  ```
+- Response thành công (`200 OK`):
+  ```json
+  {
+    "message": "Cập nhật dự án thành công!",
+    "project": {
+      "id": 1,
+      "name": "Tên dự án đã cập nhật",
+      "description": "Mô tả mới",
+      "deadline": "2026-12-20T23:59:59.000Z",
+      "createdAt": "2026-11-22T15:10:00.000Z",
+      "updatedAt": "2026-11-23T00:15:00.000Z",
+      "members": [...],
+      "_count": {
+        "tasks": 0
+      }
+    }
+  }
+  ```
 ---
 
 ## 4. Công việc (`Task`)
@@ -188,4 +258,35 @@ Giá trị `role` trong dự án: `"LEADER"` | `"MEMBER"` (mỗi dự án chỉ 
     "createdAt": "2026-11-24T17:00:00.000Z"
   }
 ]
+```
+---
+
+## 6. Middleware phân quyền dự án dùng chung
+*File khai báo:* `server/src/middleware/projectAuth.js`
+
+Gồm 2 hàm kiểm tra quyền theo từng dự án (`requireProjectMember` và `requireLeader`). **Lưu ý:** Luôn đặt sau middleware xác thực đăng nhập (`requireAuth`) để có sẵn `req.user`.
+
+### Cách hoạt động
+`requireProjectMember`**: Kiểm tra người dùng hiện tại có nằm trong bảng `ProjectMember` của dự án hay không (`LEADER` hoặc `MEMBER`). Hàm tự động tìm `projectId` từ:
+  - `req.params.projectId` (ví dụ: `/api/projects/:projectId/tasks`)
+  - `req.params.id` trên route `/api/projects/:id`
+  - `req.body.projectId` (ví dụ: `POST /api/tasks`)
+  - `taskId` hoặc `id` trên route công việc (ví dụ: `/api/tasks/:id`, `/api/tasks/:taskId/comments`)
+  - `commentId` hoặc `id` trên route bình luận (ví dụ: `/api/comments/:id`)
+  - Sau khi kiểm tra hợp lệ, middleware gắn sẵn `req.project` và `req.projectMember` để controller phía sau dùng lại.
+`requireLeader`**: Kiểm tra vai trò của thành viên trong dự án phải là `"LEADER"`. Nếu thiếu quyền sẽ trả về mã `403` kèm `{ "error": "Chỉ trưởng nhóm (LEADER) mới có quyền thực hiện thao tác này!" }`.
+
+### Ví dụ áp dụng trong các file Route
+```javascript
+import { requireProjectMember, requireLeader } from "../middleware/projectAuth.js";
+
+// 1. Thao tác dành cho mọi thành viên dự án (LEADER & MEMBER)
+router.get("/projects/:projectId/tasks", requireAuth, requireProjectMember, ...);
+router.post("/tasks", requireAuth, requireProjectMember, ...);
+router.patch("/tasks/:id", requireAuth, requireProjectMember, ...);
+router.post("/tasks/:taskId/comments", requireAuth, requireProjectMember, ...);
+
+// 2. Thao tác chỉ dành cho Trưởng nhóm (LEADER)
+router.put("/projects/:id", requireAuth, requireProjectMember, requireLeader, ...);
+router.delete("/projects/:id", requireAuth, requireProjectMember, requireLeader, ...);
 ```
