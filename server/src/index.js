@@ -1,12 +1,16 @@
 import express from 'express';
 import cors from 'cors';
 import { PrismaClient } from '@prisma/client';
+import tasksRouter from './routes/tasks.js';
 
 const prisma = new PrismaClient();
 const app = express();
 
 app.use(cors());
 app.use(express.json());
+
+// Công việc và công việc con (Người 4). Đặt trước các route cũ nên được ưu tiên.
+app.use('/api', tasksRouter);
 
 // Kiểm tra kết nối
 app.get('/api/health', async (req, res) => {
