@@ -41,13 +41,17 @@ function App() {
   const [editDeadline, setEditDeadline] = useState("");
   const [editSubmitting, setEditSubmitting] = useState(false);
 
+  // State Hộp thoại xác nhận Xóa dự án (Nhiệm vụ 3)
+  const [deleteConfirmProject, setDeleteConfirmProject] = useState(null);
+  const [deleteSubmitting, setDeleteSubmitting] = useState(false);
+
   // State Công việc (Task)
   const [selectedProjectId, setSelectedProjectId] = useState("1");
   const [tasks, setTasks] = useState([]);
   const [taskTitle, setTaskTitle] = useState("");
   const [taskPriority, setTaskPriority] = useState("MEDIUM");
 
-  // Lưu User ID đang thao tác vào localStorage để test phân quyền LEADER / MEMBER
+  // Lưu User ID đang thao tác vào localStorage
   useEffect(() => {
     if (leaderId) {
       localStorage.setItem("currentUserId", String(leaderId));
@@ -57,6 +61,13 @@ function App() {
   }, [leaderId]);
 
   const fetchProjects = async () => {
+    const validUserId = Number(leaderId);
+    if (!Number.isInteger(validUserId) || validUserId <= 0) {
+      setProjects([]);
+      setProjectsError("Vui lòng nhập User ID hợp lệ để xem các dự án bạn tham gia!");
+      return;
+    }
+
     setProjectsLoading(true);
     setProjectsError("");
     try {
@@ -71,6 +82,7 @@ function App() {
           : ""
       );
     } catch (err) {
+      setProjects([]);
       setProjectsError(err.message);
     } finally {
       setProjectsLoading(false);
@@ -87,10 +99,14 @@ function App() {
     }
   };
 
+  // Tự động tải lại dự án khi chuyển tab hoặc đổi User ID đang thao tác (Nhiệm vụ 2)
   useEffect(() => {
     if (tab === "projects" || tab === "tasks") {
       fetchProjects();
     }
+  }, [tab, leaderId]);
+
+  useEffect(() => {
     if (tab === "tasks" && selectedProjectId) {
       fetchTasks(selectedProjectId);
     }
@@ -134,7 +150,6 @@ function App() {
     }
   };
 
-  // Mở khung sửa dự án với dữ liệu hiện tại
   const openEditModal = (project) => {
     setEditingProject(project);
     setEditName(project.name || "");
@@ -161,6 +176,24 @@ function App() {
       alert("Lỗi cập nhật dự án: " + err.message);
     } finally {
       setEditSubmitting(false);
+    }
+  };
+
+  // Xác nhận xóa dự án từ hộp thoại (Nhiệm vụ 3)
+  const confirmDeleteProject = async () => {
+    if (!deleteConfirmProject) return;
+    setDeleteSubmitting(true);
+    try {
+      await apiRequest(`/projects/${deleteConfirmProject.id}`, { method: "DELETE" });
+      if (String(deleteConfirmProject.id) === String(selectedProjectId)) {
+        setSelectedProjectId("");
+      }
+      setDeleteConfirmProject(null);
+      fetchProjects();
+    } catch (err) {
+      alert("Lỗi xóa dự án: " + err.message);
+    } finally {
+      setDeleteSubmitting(false);
     }
   };
 
@@ -205,17 +238,6 @@ function App() {
       fetchTasks(selectedProjectId);
     } catch (err) {
       alert("Lỗi xóa công việc: " + err.message);
-    }
-  };
-
-  const handleDeleteProject = async (projectId) => {
-    if (!window.confirm("Xóa dự án sẽ xóa toàn bộ công việc bên trong. Bạn có chắc không?")) return;
-    try {
-      await apiRequest(`/projects/${projectId}`, { method: "DELETE" });
-      if (String(projectId) === String(selectedProjectId)) setSelectedProjectId("");
-      fetchProjects();
-    } catch (err) {
-      alert("Lỗi xóa dự án: " + err.message);
     }
   };
 
@@ -276,13 +298,13 @@ function App() {
                 <strong>Chức năng 1:</strong> Đăng ký tài khoản người dùng (Lưu bảng <code>User</code>).
               </li>
               <li>
-                <strong>Chức năng 2:</strong> Tạo, sửa và xem danh sách dự án kèm thời hạn & phân quyền Trưởng nhóm.
+                <strong>Chức năng 2:</strong> Tạo, sửa, xóa và xem các dự án mình tham gia kèm phân quyền Trưởng nhóm.
               </li>
               <li>
                 <strong>Chức năng 3:</strong> Thêm và xem công việc theo từng dự án (Lưu bảng <code>Task</code>).
               </li>
               <li>
-                <strong>Chức năng 4:</strong> Sửa trạng thái công việc và xóa công việc / dự án.
+                <strong>Chức năng 4:</strong> Sửa trạng thái công việc và xóa công việc.
               </li>
             </ul>
           </div>
@@ -383,7 +405,7 @@ function App() {
               </div>
               <div>
                 <label className="block text-sm font-medium mb-1">
-                  User ID đang thao tác (Trưởng nhóm):
+                  User ID đang thao tác (Tài khoản hiện tại):
                 </label>
                 <input
                   type="number"
@@ -404,7 +426,7 @@ function App() {
               </div>
             </form>
 
-            {/* Khung Sửa dự án (hiện khi bấm nút Sửa) */}
+            {/* Khung Sửa dự án */}
             {editingProject && (
               <div className="mb-8 bg-yellow-50 border border-yellow-300 p-4 rounded-lg shadow-sm">
                 <div className="flex justify-between items-center mb-3">
@@ -446,7 +468,6 @@ function App() {
                           type="button"
                           onClick={() => setEditDeadline("")}
                           className="px-3 py-2 text-xs bg-gray-200 hover:bg-gray-300 rounded"
-                          title="Xóa thời hạn"
                         >
                           Xóa hạn
                         </button>
@@ -483,22 +504,23 @@ function App() {
               </div>
             )}
 
-            <h3 className="text-lg font-semibold mb-3">Danh sách Dự án:</h3>
+            <h3 className="text-lg font-semibold mb-3">
+              Dự án bạn tham gia (User ID: {leaderId || "?"}):
+            </h3>
 
-            {/* 3 trạng thái chuẩn: Đang tải / Lỗi / Trống */}
             {projectsLoading && (
               <p className="text-blue-600 py-4">Đang tải danh sách dự án...</p>
             )}
 
             {!projectsLoading && projectsError && (
               <div className="p-3 bg-red-50 border border-red-300 text-red-700 rounded mb-4">
-                Lỗi tải dữ liệu: {projectsError}
+                {projectsError}
               </div>
             )}
 
             {!projectsLoading && !projectsError && projects.length === 0 && (
               <p className="text-gray-500">
-                Chưa có dự án nào. Hãy tạo tài khoản trước rồi dùng ID đó để tạo dự án.
+                Bạn chưa tham gia dự án nào. Hãy tạo dự án mới ở khung phía trên.
               </p>
             )}
 
@@ -507,16 +529,28 @@ function App() {
                 {projects.map((p) => {
                   const leader = p.members?.find((m) => m.role === "LEADER");
                   const isOverdue = p.deadline && new Date(p.deadline) < new Date();
+                  const isLeader = p.role === "LEADER";
                   return (
                     <div
                       key={p.id}
                       className="border p-4 rounded bg-white shadow-sm flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3"
                     >
                       <div>
-                        <h4 className="font-bold text-lg text-blue-700">
-                          #{p.id} - {p.name}
-                        </h4>
-                        <p className="text-sm text-gray-600">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h4 className="font-bold text-lg text-blue-700">
+                            #{p.id} - {p.name}
+                          </h4>
+                          <span
+                            className={`text-xs px-2 py-0.5 rounded font-semibold ${
+                              isLeader
+                                ? "bg-purple-100 text-purple-800"
+                                : "bg-gray-100 text-gray-700"
+                            }`}
+                          >
+                            {isLeader ? "Trưởng nhóm (LEADER)" : "Thành viên (MEMBER)"}
+                          </span>
+                        </div>
+                        <p className="text-sm text-gray-600 mt-0.5">
                           {p.description || "Không có mô tả"}
                         </p>
                         <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500 mt-1.5">
@@ -546,7 +580,7 @@ function App() {
                           Sửa
                         </button>
                         <button
-                          onClick={() => handleDeleteProject(p.id)}
+                          onClick={() => setDeleteConfirmProject(p)}
                           className="text-xs bg-red-100 text-red-700 px-3 py-1 rounded hover:bg-red-200 font-medium"
                         >
                           Xóa
@@ -658,6 +692,41 @@ function App() {
           </div>
         )}
       </div>
+
+      {/* Hộp thoại xác nhận Xóa dự án (Nhiệm vụ 3) */}
+      {deleteConfirmProject && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+            <h3 className="text-lg font-bold text-red-600 mb-2">Xác nhận xóa dự án</h3>
+            <p className="text-sm text-gray-700 mb-4">
+              Bạn có chắc chắn muốn xóa dự án{" "}
+              <strong>
+                #{deleteConfirmProject.id} - {deleteConfirmProject.name}
+              </strong>
+              ? Toàn bộ công việc, thành viên và thông báo liên quan sẽ bị xóa vĩnh viễn và không
+              thể khôi phục.
+            </p>
+            <div className="flex justify-end gap-3">
+              <button
+                type="button"
+                disabled={deleteSubmitting}
+                onClick={() => setDeleteConfirmProject(null)}
+                className="px-4 py-2 rounded bg-gray-200 hover:bg-gray-300 text-gray-800 text-sm font-medium"
+              >
+                Hủy
+              </button>
+              <button
+                type="button"
+                disabled={deleteSubmitting}
+                onClick={confirmDeleteProject}
+                className="px-4 py-2 rounded bg-red-600 hover:bg-red-700 text-white text-sm font-medium disabled:opacity-50"
+              >
+                {deleteSubmitting ? "Đang xóa..." : "Xác nhận xóa"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
