@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import TaskManager from './components/tasks/TaskManager.jsx';
 
 const STATUS_LABEL = {
   TODO: 'Chưa thực hiện',
@@ -23,6 +24,7 @@ function App() {
 
   // State Công việc (Task)
   const [selectedProjectId, setSelectedProjectId] = useState('1');
+  const [currentUserId, setCurrentUserId] = useState('1'); // TẠM: giả lập người đăng nhập đến khi có đăng nhập thật
   const [tasks, setTasks] = useState([]);
   const [taskTitle, setTaskTitle] = useState('');
   const [taskPriority, setTaskPriority] = useState('MEDIUM');
@@ -60,9 +62,6 @@ function App() {
   useEffect(() => {
     if (tab === 'projects' || tab === 'tasks') {
       fetchProjects();
-    }
-    if (tab === 'tasks' && selectedProjectId) {
-      fetchTasks(selectedProjectId);
     }
   }, [tab, selectedProjectId]);
 
@@ -273,79 +272,25 @@ function App() {
           </div>
         )}
 
-        {/* Tab Công việc */}
+        {/* Tab Công việc (Người 4) */}
         {tab === 'tasks' && (
           <div>
             <h2 className="text-xl font-semibold mb-4">Quản lý Công việc theo Dự án</h2>
-            <div className="mb-4">
-              <label className="block text-sm font-medium mb-1">Chọn Dự án:</label>
-              <select
-                value={selectedProjectId}
-                onChange={(e) => setSelectedProjectId(e.target.value)}
-                className="border p-2 rounded w-full max-w-xs bg-white"
-              >
-                {projects.length === 0 && <option value="">(Chưa có dự án nào)</option>}
-                {projects.map((p) => (
-                  <option key={p.id} value={p.id}>#{p.id} - {p.name}</option>
-                ))}
-              </select>
+            <div className="flex flex-wrap gap-4 mb-4">
+              <div>
+                <label className="block text-sm font-medium mb-1">Chọn Dự án:</label>
+                <select value={selectedProjectId} onChange={(e) => setSelectedProjectId(e.target.value)} className="border p-2 rounded bg-white">
+                  {projects.map((p) => (
+                    <option key={p.id} value={p.id}>#{p.id} - {p.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Bạn là User ID (tạm):</label>
+                <input type="number" value={currentUserId} onChange={(e) => setCurrentUserId(e.target.value)} className="border p-2 rounded w-28" />
+              </div>
             </div>
-
-            <form onSubmit={handleCreateTask} className="flex flex-wrap gap-3 mb-6 bg-gray-50 p-4 rounded border">
-              <input
-                type="text"
-                value={taskTitle}
-                onChange={(e) => setTaskTitle(e.target.value)}
-                placeholder="Nhập tên công việc cần làm..."
-                className="flex-1 border p-2 rounded min-w-[200px]"
-                required
-              />
-              <select
-                value={taskPriority}
-                onChange={(e) => setTaskPriority(e.target.value)}
-                className="border p-2 rounded bg-white"
-              >
-                <option value="LOW">Ưu tiên: Thấp</option>
-                <option value="MEDIUM">Ưu tiên: Trung bình</option>
-                <option value="HIGH">Ưu tiên: Cao</option>
-              </select>
-              <button type="submit" className="bg-blue-600 text-white px-5 py-2 rounded hover:bg-blue-700">Thêm Task</button>
-            </form>
-
-            <h3 className="text-lg font-semibold mb-3">Danh sách Công việc:</h3>
-            <div className="space-y-2">
-              {tasks.length === 0 && <p className="text-gray-500">Dự án này chưa có công việc nào.</p>}
-              {tasks.map((t) => (
-                <div key={t.id} className="border p-3 rounded flex justify-between items-center bg-white">
-                  <div className="flex-1">
-                    <span className="font-medium text-gray-800">{t.title}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <select
-                      value={t.status}
-                      onChange={(e) => handleChangeStatus(t.id, e.target.value)}
-                      className="border p-1 rounded text-xs bg-white"
-                    >
-                      {Object.entries(STATUS_LABEL).map(([value, label]) => (
-                        <option key={value} value={value}>{label}</option>
-                      ))}
-                    </select>
-                    <span className={`text-xs font-semibold px-2 py-1 rounded ${
-                      t.priority === 'HIGH' ? 'bg-red-100 text-red-700' :
-                      t.priority === 'MEDIUM' ? 'bg-yellow-100 text-yellow-700' : 'bg-green-100 text-green-700'
-                    }`}>
-                      {t.priority}
-                    </span>
-                    <button
-                      onClick={() => handleDeleteTask(t.id)}
-                      className="text-xs bg-red-100 text-red-700 px-3 py-1 rounded hover:bg-red-200 font-medium"
-                    >
-                      Xóa
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
+            <TaskManager projectId={selectedProjectId} userId={currentUserId} />
           </div>
         )}
       </div>
