@@ -15,6 +15,7 @@
   }
   ```
   | Mã HTTP | Ý nghĩa | Ví dụ thông báo |
+  |---|---|---|
   | `400` | Dữ liệu đầu vào không hợp lệ / thiếu trường | `{"error": "Tên dự án không được để trống!"}` |
   | `401` | Chưa đăng nhập hoặc token hết hạn | `{"error": "Phiên đăng nhập không hợp lệ hoặc đã hết hạn!"}` |
   | `403` | Không đủ quyền (ví dụ MEMBER thực hiện lệnh của LEADER) | `{"error": "Chỉ trưởng nhóm (LEADER) mới có quyền thực hiện thao tác này!"}` |
@@ -153,11 +154,47 @@ Giá trị `role` trong dự án: `"LEADER"` | `"MEMBER"` (mỗi dự án chỉ 
       "assigneeId": 2,
       "parentId": 10,
       "createdAt": "2026-11-22T16:10:00.000Z",
-      "updatedAt": "2026-11-22T16:10:00.000Z"
+      "updatedAt": "2026-11-22T16:10:00.000Z",
+      "assignee": { "id": 2, "name": "Trần Văn B", "email": "vanb@example.com", "avatarUrl": null }
     }
-  ]
+  ],
+"subtaskProgress": { "done": 0, "total": 1 }
+}
+
+
+```
+### Danh sách API công việc
+
+Tạm thời gửi header `X-User-Id: <id>` thay cho `Authorization` cho đến khi có đăng nhập thật.
+
+| Phương thức | Đường dẫn | Quyền | Mô tả |
+|---|---|---|---|
+| GET | `/api/projects/:projectId/tasks` | Thành viên dự án | Danh sách công việc chính (kèm `subtasks`, `subtaskProgress`), mới nhất trước |
+| POST | `/api/tasks` | `LEADER` | Tạo công việc, trả `201` kèm Task |
+| GET | `/api/tasks/:id` | Thành viên dự án | Chi tiết một công việc |
+| PATCH | `/api/tasks/:id` | `LEADER`: mọi trường; `MEMBER`: chỉ `status` của việc được giao cho mình | Sửa công việc, trả Task |
+| DELETE | `/api/tasks/:id` | `LEADER` | Xóa kèm công việc con và bình luận, trả `{ "message": "Đã xóa công việc." }` |
+| POST | `/api/tasks/:id/subtasks` | `LEADER` | Tạo công việc con (chỉ 1 cấp), trả `201` kèm Task con (không có `subtasks`) |
+
+Dữ liệu gửi lên khi tạo hoặc sửa (khi sửa chỉ cần gửi trường muốn đổi):
+
+```json
+{
+  "projectId": 1,
+  "title": "Thiết kế trang đăng nhập",
+  "description": null,
+  "assigneeId": 2,
+  "dueDate": "2026-11-28",
+  "priority": "HIGH",
+  "status": "TODO"
 }
 ```
+
+- `title`: bắt buộc khi tạo, tối đa 200 ký tự.
+- `assigneeId`: phải là thành viên của dự án, hoặc `null` nếu chưa giao.
+- `dueDate`: `"YYYY-MM-DD"` hoặc ISO 8601, `null` nếu không đặt.
+- Công việc cha có thêm `"subtaskProgress": { "done": 1, "total": 3 }`; mỗi công việc con trong `subtasks` có thêm `assignee`.
+- Lỗi: `400` dữ liệu sai, `401` chưa đăng nhập, `403` không đủ quyền, `404` không tìm thấy.
 
 ---
 
