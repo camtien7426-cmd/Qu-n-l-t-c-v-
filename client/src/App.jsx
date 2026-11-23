@@ -34,14 +34,20 @@ function App() {
   const [projectDeadline, setProjectDeadline] = useState("");
   const [leaderId, setLeaderId] = useState(() => localStorage.getItem("currentUserId") || "1");
 
-  // State Sửa dự án
+  // State Sửa dự án (Chỉ LEADER)
   const [editingProject, setEditingProject] = useState(null);
   const [editName, setEditName] = useState("");
   const [editDesc, setEditDesc] = useState("");
   const [editDeadline, setEditDeadline] = useState("");
   const [editSubmitting, setEditSubmitting] = useState(false);
 
-  // State Hộp thoại xác nhận Xóa dự án (Nhiệm vụ 3)
+  // State Quản lý thành viên theo dự án
+  const [expandedMembersProjectId, setExpandedMembersProjectId] = useState(null);
+  const [memberEmail, setMemberEmail] = useState("");
+  const [memberSubmitting, setMemberSubmitting] = useState(false);
+  const [memberFeedback, setMemberFeedback] = useState({ type: "", text: "" });
+
+  // State Hộp thoại xác nhận Xóa dự án (Chỉ LEADER)
   const [deleteConfirmProject, setDeleteConfirmProject] = useState(null);
   const [deleteSubmitting, setDeleteSubmitting] = useState(false);
 
@@ -99,9 +105,10 @@ function App() {
     }
   };
 
-  // Tự động tải lại dự án khi chuyển tab hoặc đổi User ID đang thao tác (Nhiệm vụ 2)
   useEffect(() => {
     if (tab === "projects" || tab === "tasks") {
+      setEditingProject(null);
+      setDeleteConfirmProject(null);
       fetchProjects();
     }
   }, [tab, leaderId]);
@@ -151,6 +158,7 @@ function App() {
   };
 
   const openEditModal = (project) => {
+    if (project.role !== "LEADER") return;
     setEditingProject(project);
     setEditName(project.name || "");
     setEditDesc(project.description || "");
@@ -179,7 +187,6 @@ function App() {
     }
   };
 
-  // Xác nhận xóa dự án từ hộp thoại (Nhiệm vụ 3)
   const confirmDeleteProject = async () => {
     if (!deleteConfirmProject) return;
     setDeleteSubmitting(true);
@@ -188,12 +195,65 @@ function App() {
       if (String(deleteConfirmProject.id) === String(selectedProjectId)) {
         setSelectedProjectId("");
       }
+      if (expandedMembersProjectId === deleteConfirmProject.id) {
+        setExpandedMembersProjectId(null);
+      }
       setDeleteConfirmProject(null);
       fetchProjects();
     } catch (err) {
       alert("Lỗi xóa dự án: " + err.message);
     } finally {
       setDeleteSubmitting(false);
+    }
+  };
+
+  const toggleMembersPanel = (projectId) => {
+    setMemberFeedback({ type: "", text: "" });
+    setMemberEmail("");
+    setExpandedMembersProjectId((prev) => (prev === projectId ? null : projectId));
+  };
+
+  const handleAddMember = async (e, projectId) => {
+    e.preventDefault();
+    setMemberSubmitting(true);
+    setMemberFeedback({ type: "", text: "" });
+    try {
+      const data = await apiRequest(`/projects/${projectId}/members`, {
+        method: "POST",
+        body: JSON.stringify({ email: memberEmail }),
+      });
+      setMemberEmail("");
+      setMemberFeedback({
+        type: "success",
+        text: data.message || "Thêm thành viên thành công!",
+      });
+      fetchProjects();
+    } catch (err) {
+      setMemberFeedback({ type: "error", text: err.message });
+    } finally {
+      setMemberSubmitting(false);
+    }
+  };
+
+  const handleRemoveMember = async (projectId, targetMember) => {
+    const memberName = targetMember.user?.name || `ID ${targetMember.userId}`;
+    if (!window.confirm(`Bạn có chắc muốn xóa "${memberName}" khỏi dự án này?`)) return;
+
+    setMemberSubmitting(true);
+    setMemberFeedback({ type: "", text: "" });
+    try {
+      const data = await apiRequest(`/projects/${projectId}/members/${targetMember.userId}`, {
+        method: "DELETE",
+      });
+      setMemberFeedback({
+        type: "success",
+        text: data.message || "Đã loại thành viên khỏi dự án!",
+      });
+      fetchProjects();
+    } catch (err) {
+      setMemberFeedback({ type: "error", text: err.message });
+    } finally {
+      setMemberSubmitting(false);
     }
   };
 
@@ -298,7 +358,7 @@ function App() {
                 <strong>Chức năng 1:</strong> Đăng ký tài khoản người dùng (Lưu bảng <code>User</code>).
               </li>
               <li>
-                <strong>Chức năng 2:</strong> Tạo, sửa, xóa và xem các dự án mình tham gia kèm phân quyền Trưởng nhóm.
+                <strong>Chức năng 2:</strong> Tạo, sửa, xóa, quản lý thành viên và xem các dự án mình tham gia.
               </li>
               <li>
                 <strong>Chức năng 3:</strong> Thêm và xem công việc theo từng dự án (Lưu bảng <code>Task</code>).
@@ -426,7 +486,7 @@ function App() {
               </div>
             </form>
 
-            {/* Khung Sửa dự án */}
+            {/* Khung Sửa dự án (Chỉ mở khi user là LEADER) */}
             {editingProject && (
               <div className="mb-8 bg-yellow-50 border border-yellow-300 p-4 rounded-lg shadow-sm">
                 <div className="flex justify-between items-center mb-3">
@@ -530,62 +590,171 @@ function App() {
                   const leader = p.members?.find((m) => m.role === "LEADER");
                   const isOverdue = p.deadline && new Date(p.deadline) < new Date();
                   const isLeader = p.role === "LEADER";
+                  const isMembersExpanded = expandedMembersProjectId === p.id;
+
                   return (
-                    <div
-                      key={p.id}
-                      className="border p-4 rounded bg-white shadow-sm flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3"
-                    >
-                      <div>
-                        <div className="flex flex-wrap items-center gap-2">
-                          <h4 className="font-bold text-lg text-blue-700">
-                            #{p.id} - {p.name}
-                          </h4>
-                          <span
-                            className={`text-xs px-2 py-0.5 rounded font-semibold ${
-                              isLeader
-                                ? "bg-purple-100 text-purple-800"
-                                : "bg-gray-100 text-gray-700"
-                            }`}
+                    <div key={p.id} className="border p-4 rounded bg-white shadow-sm">
+                      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
+                        <div>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <h4 className="font-bold text-lg text-blue-700">
+                              #{p.id} - {p.name}
+                            </h4>
+                            <span
+                              className={`text-xs px-2 py-0.5 rounded font-semibold ${
+                                isLeader
+                                  ? "bg-purple-100 text-purple-800"
+                                  : "bg-gray-100 text-gray-700"
+                              }`}
+                            >
+                              {isLeader ? "Trưởng nhóm (LEADER)" : "Thành viên (MEMBER)"}
+                            </span>
+                          </div>
+                          <p className="text-sm text-gray-600 mt-0.5">
+                            {p.description || "Không có mô tả"}
+                          </p>
+                          <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500 mt-1.5">
+                            <span>
+                              Trưởng nhóm:{" "}
+                              <strong className="text-gray-700">
+                                {leader?.user?.name || "N/A"} (ID: {leader?.userId ?? "?"})
+                              </strong>
+                            </span>
+                            <span className={isOverdue ? "text-red-600 font-semibold" : ""}>
+                              Thời hạn:{" "}
+                              <strong className={isOverdue ? "text-red-600" : "text-gray-700"}>
+                                {formatDateVi(p.deadline)}
+                                {isOverdue ? " (Quá hạn)" : ""}
+                              </strong>
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-2 shrink-0">
+                          <span className="text-xs bg-blue-100 text-blue-800 px-3 py-1 rounded-full font-medium">
+                            {p._count?.tasks || 0} công việc
+                          </span>
+                          <button
+                            onClick={() => toggleMembersPanel(p.id)}
+                            className="text-xs bg-indigo-100 text-indigo-800 px-3 py-1 rounded hover:bg-indigo-200 font-medium"
                           >
-                            {isLeader ? "Trưởng nhóm (LEADER)" : "Thành viên (MEMBER)"}
-                          </span>
-                        </div>
-                        <p className="text-sm text-gray-600 mt-0.5">
-                          {p.description || "Không có mô tả"}
-                        </p>
-                        <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500 mt-1.5">
-                          <span>
-                            Trưởng nhóm:{" "}
-                            <strong className="text-gray-700">
-                              {leader?.user?.name || "N/A"} (ID: {leader?.userId ?? "?"})
-                            </strong>
-                          </span>
-                          <span className={isOverdue ? "text-red-600 font-semibold" : ""}>
-                            Thời hạn:{" "}
-                            <strong className={isOverdue ? "text-red-600" : "text-gray-700"}>
-                              {formatDateVi(p.deadline)}
-                              {isOverdue ? " (Quá hạn)" : ""}
-                            </strong>
-                          </span>
+                            Thành viên ({p.members?.length || 0})
+                          </button>
+
+                          {/* Chỉ LEADER mới thấy nút Sửa và Xóa dự án */}
+                          {isLeader && (
+                            <>
+                              <button
+                                onClick={() => openEditModal(p)}
+                                className="text-xs bg-amber-100 text-amber-800 px-3 py-1 rounded hover:bg-amber-200 font-medium"
+                              >
+                                Sửa
+                              </button>
+                              <button
+                                onClick={() => setDeleteConfirmProject(p)}
+                                className="text-xs bg-red-100 text-red-700 px-3 py-1 rounded hover:bg-red-200 font-medium"
+                              >
+                                Xóa
+                              </button>
+                            </>
+                          )}
                         </div>
                       </div>
-                      <div className="flex items-center gap-2 shrink-0">
-                        <span className="text-xs bg-blue-100 text-blue-800 px-3 py-1 rounded-full font-medium">
-                          {p._count?.tasks || 0} công việc
-                        </span>
-                        <button
-                          onClick={() => openEditModal(p)}
-                          className="text-xs bg-amber-100 text-amber-800 px-3 py-1 rounded hover:bg-amber-200 font-medium"
-                        >
-                          Sửa
-                        </button>
-                        <button
-                          onClick={() => setDeleteConfirmProject(p)}
-                          className="text-xs bg-red-100 text-red-700 px-3 py-1 rounded hover:bg-red-200 font-medium"
-                        >
-                          Xóa
-                        </button>
-                      </div>
+
+                      {/* Khu vực Danh sách & Quản lý thành viên */}
+                      {isMembersExpanded && (
+                        <div className="mt-4 pt-4 border-t bg-gray-50 p-3 rounded">
+                          <div className="flex justify-between items-center mb-3">
+                            <h5 className="text-sm font-semibold text-gray-800">
+                              Danh sách thành viên dự án ({p.members?.length || 0})
+                            </h5>
+                            <button
+                              type="button"
+                              onClick={() => setExpandedMembersProjectId(null)}
+                              className="text-xs text-gray-500 hover:text-gray-800"
+                            >
+                              Thu gọn ▲
+                            </button>
+                          </div>
+
+                          {/* Chỉ LEADER mới thấy form thêm thành viên */}
+                          {isLeader && (
+                            <form
+                              onSubmit={(e) => handleAddMember(e, p.id)}
+                              className="flex flex-col sm:flex-row gap-2 mb-3"
+                            >
+                              <input
+                                type="email"
+                                value={memberEmail}
+                                onChange={(e) => setMemberEmail(e.target.value)}
+                                placeholder="Nhập email người dùng cần thêm..."
+                                className="flex-1 border p-2 rounded text-sm bg-white"
+                                required
+                              />
+                              <button
+                                type="submit"
+                                disabled={memberSubmitting}
+                                className="bg-indigo-600 text-white px-4 py-2 rounded text-sm font-medium hover:bg-indigo-700 disabled:opacity-50"
+                              >
+                                {memberSubmitting ? "Đang thêm..." : "+ Thêm thành viên"}
+                              </button>
+                            </form>
+                          )}
+
+                          {memberFeedback.text && (
+                            <div
+                              className={`mb-3 p-2 rounded text-xs ${
+                                memberFeedback.type === "error"
+                                  ? "bg-red-50 border border-red-200 text-red-700"
+                                  : "bg-green-50 border border-green-200 text-green-700"
+                              }`}
+                            >
+                              {memberFeedback.text}
+                            </div>
+                          )}
+
+                          <div className="space-y-2">
+                            {(p.members || []).map((m) => (
+                              <div
+                                key={m.userId}
+                                className="flex justify-between items-center bg-white border px-3 py-2 rounded text-sm"
+                              >
+                                <div>
+                                  <span className="font-medium text-gray-800">
+                                    {m.user?.name || "Người dùng"}
+                                  </span>{" "}
+                                  <span className="text-xs text-gray-500">
+                                    ({m.user?.email || "N/A"} • ID: {m.userId})
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <span
+                                    className={`text-xs px-2 py-0.5 rounded font-semibold ${
+                                      m.role === "LEADER"
+                                        ? "bg-purple-100 text-purple-800"
+                                        : "bg-gray-100 text-gray-700"
+                                    }`}
+                                  >
+                                    {m.role}
+                                  </span>
+
+                                  {/* Chỉ LEADER mới thấy nút xóa và chỉ hiện ở các MEMBER */}
+                                  {isLeader && m.role !== "LEADER" && (
+                                    <button
+                                      type="button"
+                                      disabled={memberSubmitting}
+                                      onClick={() => handleRemoveMember(p.id, m)}
+                                      className="text-xs bg-red-100 text-red-700 px-2.5 py-1 rounded hover:bg-red-200 font-medium disabled:opacity-50"
+                                    >
+                                      Loại bỏ
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   );
                 })}
@@ -693,7 +862,7 @@ function App() {
         )}
       </div>
 
-      {/* Hộp thoại xác nhận Xóa dự án (Nhiệm vụ 3) */}
+      {/* Hộp thoại xác nhận Xóa dự án */}
       {deleteConfirmProject && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">

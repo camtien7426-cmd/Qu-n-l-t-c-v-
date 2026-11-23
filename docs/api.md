@@ -57,7 +57,7 @@ Lưu ý: Không bao giờ trả về các trường `passwordHash`, `resetTokenH
 ---
 
 ## 3. Dự án (`Project` & `ProjectMember`)
-Giá trị `role` trong dự án: `"LEADER"` | `"MEMBER"` (mỗi dự án chỉ có 1 `LEADER`).*
+*Giá trị `role` trong dự án: `"LEADER"` | `"MEMBER"` (mỗi dự án chỉ có 1 `LEADER`).*
 
 ### Danh sách dự án (`GET /api/projects`)
 ```json
@@ -113,6 +113,7 @@ Giá trị `role` trong dự án: `"LEADER"` | `"MEMBER"` (mỗi dự án chỉ 
   ]
 }
 ```
+
 ### Tạo dự án mới (`POST /api/projects`)
 - Quyền hạn: Yêu cầu đăng nhập (`requireAuth`). Người tạo tự động trở thành `LEADER` của dự án.
 - Request Body:
@@ -124,7 +125,7 @@ Giá trị `role` trong dự án: `"LEADER"` | `"MEMBER"` (mỗi dự án chỉ 
   }
   ```
   *(Trường `description` và `deadline` có thể bỏ trống hoặc truyền `null`).*
-Response thành công (`201 Created`):
+- Response thành công (`201 Created`):
   ```json
   {
     "message": "Tạo dự án thành công!",
@@ -184,8 +185,55 @@ Response thành công (`201 Created`):
     }
   }
   ```
----
 
+### Thêm thành viên vào dự án (`POST /api/projects/:id/members`)
+- Quyền hạn: Yêu cầu đăng nhập (`requireAuth`), là thành viên dự án (`requireProjectMember`) và phải là Trưởng nhóm (`requireLeader`).
+- Request Body:
+  ```json
+  {
+    "email": "vanb@example.com"
+  }
+  ```
+- Response thành công (`201 Created`):
+  ```json
+  {
+    "message": "Thêm thành viên thành công!",
+    "member": {
+      "projectId": 1,
+      "userId": 2,
+      "role": "MEMBER",
+      "joinedAt": "2026-11-23T13:30:00.000Z",
+      "user": {
+        "id": 2,
+        "name": "Trần Văn B",
+        "email": "vanb@example.com",
+        "avatarUrl": null
+      }
+    }
+  }
+  ```
+- Mã lỗi:
+  - `400`: `{"error": "Email thành viên không được để trống!"}`
+  - `401`: `{"error": "Vui lòng đăng nhập để tiếp tục!"}`
+  - `403`: `{"error": "Chỉ trưởng nhóm (LEADER) mới có quyền thực hiện thao tác này!"}`
+  - `404`: `{"error": "Không tìm thấy người dùng với email này!"}` hoặc `{"error": "Không tìm thấy dự án!"}`
+  - `409`: `{"error": "Người dùng này đã là thành viên của dự án!"}`
+
+### Xóa thành viên khỏi dự án (`DELETE /api/projects/:id/members/:userId`)
+- Quyền hạn: Yêu cầu đăng nhập (`requireAuth`), là thành viên dự án (`requireProjectMember`) và phải là Trưởng nhóm (`requireLeader`).
+- Response thành công (`200 OK`):
+  ```json
+  {
+    "message": "Đã loại thành viên khỏi dự án!"
+  }
+  ```
+- Mã lỗi:
+  - `400`: `{"error": "Không thể xóa trưởng nhóm khỏi dự án!"}`
+  - `401`: `{"error": "Vui lòng đăng nhập để tiếp tục!"}`
+  - `403`: `{"error": "Chỉ trưởng nhóm (LEADER) mới có quyền thực hiện thao tác này!"}`
+  - `404`: `{"error": "Thành viên không thuộc dự án này!"}` hoặc `{"error": "Không tìm thấy dự án!"}`
+
+---
 ## 4. Công việc (`Task`)
 - Trạng thái (`status`): `"TODO"` | `"IN_PROGRESS"` | `"DONE"`
 - Độ ưu tiên (`priority`): `"LOW"` | `"MEDIUM"` | `"HIGH"`

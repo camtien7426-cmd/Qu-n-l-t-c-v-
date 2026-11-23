@@ -4,6 +4,7 @@ import { requireProjectMember, requireLeader } from "../middleware/projectAuth.j
 
 const router = express.Router();
 
+// Chỉ trả về các trường an toàn của User, không lộ passwordHash hay token đặt lại mật khẩu
 const safeUserSelect = {
   id: true,
   name: true,
@@ -11,6 +12,7 @@ const safeUserSelect = {
   avatarUrl: true,
 };
 
+// Kiểm tra và chuẩn hóa trường thời hạn (deadline)
 function parseDeadline(rawDeadline) {
   if (rawDeadline === undefined) return { value: undefined };
   if (rawDeadline === null || String(rawDeadline).trim() === "") {
@@ -23,7 +25,7 @@ function parseDeadline(rawDeadline) {
   return { value: parsed };
 }
 
-// 1. Lấy danh sách dự án CHỈ CỦA NGƯỜI DÙNG HIỆN TẠI THAM GIA (Nhiệm vụ 2)
+// 1. Lấy danh sách dự án CHỈ CỦA NGƯỜI DÙNG HIỆN TẠI THAM GIA
 router.get("/", async (req, res, next) => {
   try {
     const userId = Number(req.user?.id ?? req.user?.userId ?? req.headers["x-user-id"]);
@@ -40,6 +42,7 @@ router.get("/", async (req, res, next) => {
       include: {
         members: {
           include: { user: { select: safeUserSelect } },
+          orderBy: { joinedAt: "asc" },
         },
         _count: {
           select: { tasks: true, members: true },
@@ -64,7 +67,38 @@ router.get("/", async (req, res, next) => {
   }
 });
 
-// 2. Tạo dự án mới (Nhiệm vụ 1)
+// 2. Lấy chi tiết một dự án & danh sách thành viên (Chỉ thành viên dự án mới được xem)
+router.get("/:id", requireProjectMember, async (req, res, next) => {
+  try {
+    const project = await prisma.project.findUnique({
+      where: { id: req.project.id },
+      include: {
+        members: {
+          include: { user: { select: safeUserSelect } },
+          orderBy: { joinedAt: "asc" },
+        },
+        _count: {
+          select: { tasks: true, members: true },
+        },
+      },
+    });
+
+    if (!project) {
+      return res.status(404).json({ error: "Không tìm thấy dự án!" });
+    }
+
+    res.json({
+      ...project,
+      role: req.projectMember.role,
+      memberCount: project._count.members,
+      taskCount: project._count.tasks,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// 3. Tạo dự án mới (Người tạo tự động trở thành LEADER)
 router.post("/", async (req, res, next) => {
   try {
     const { name, description, deadline, leaderId } = req.body;
@@ -78,7 +112,9 @@ router.post("/", async (req, res, next) => {
       return res.status(400).json({ error: parsedDeadline.error });
     }
 
-    const creatorId = Number(req.user?.id ?? req.user?.userId ?? leaderId);
+    const creatorId = Number(
+      req.user?.id ?? req.user?.userId ?? req.headers["x-user-id"] ?? leaderId
+    );
     if (!Number.isInteger(creatorId) || creatorId <= 0) {
       return res.status(401).json({ error: "Vui lòng đăng nhập để tạo dự án!" });
     }
@@ -124,7 +160,7 @@ router.post("/", async (req, res, next) => {
   }
 });
 
-// 3. Sửa thông tin dự án - Chỉ LEADER (Nhiệm vụ 1)
+// 4. Cập nhật thông tin dự án (Chỉ LEADER)
 router.put("/:id", requireProjectMember, requireLeader, async (req, res, next) => {
   try {
     const { name, description, deadline } = req.body;
@@ -176,7 +212,7 @@ router.put("/:id", requireProjectMember, requireLeader, async (req, res, next) =
   }
 });
 
-// 4. Xóa dự án - Chỉ LEADER (Nhiệm vụ 3)
+// 5. Xóa dự án (Chỉ LEADER)
 router.delete("/:id", requireProjectMember, requireLeader, async (req, res, next) => {
   try {
     await prisma.project.delete({ where: { id: req.project.id } });
@@ -188,5 +224,102 @@ router.delete("/:id", requireProjectMember, requireLeader, async (req, res, next
     next(error);
   }
 });
+
+// 6. Thêm thành viên vào dự án theo email (Chỉ LEADER)
+router.post("/:id/members", requireProjectMember, requireLeader, async (req, res, next) => {
+  try {
+    const rawEmail = req.body?.email;
+    const normalizedEmail = rawEmail ? String(rawEmail).trim().toLowerCase() : "";
+
+    if (!normalizedEmail) {
+      return res.status(400).json({ error: "Email thành viên không được để trống!" });
+    }
+
+    const targetUser = await prisma.user.findUnique({
+      where: { email: normalizedEmail },
+      select: safeUserSelect,
+    });
+
+    if (!targetUser) {
+      return res.status(404).json({ error: "Không tìm thấy người dùng với email này!" });
+    }
+
+    const existingMember = await prisma.projectMember.findUnique({
+      where: {
+        projectId_userId: {
+          projectId: req.project.id,
+          userId: targetUser.id,
+        },
+      },
+    });
+
+    if (existingMember) {
+      return res.status(409).json({ error: "Người dùng này đã là thành viên của dự án!" });
+    }
+
+    const newMember = await prisma.projectMember.create({
+      data: {
+        projectId: req.project.id,
+        userId: targetUser.id,
+        role: "MEMBER",
+      },
+      include: {
+        user: { select: safeUserSelect },
+      },
+    });
+
+    res.status(201).json({
+      message: "Thêm thành viên thành công!",
+      member: newMember,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// 7. Xóa thành viên khỏi dự án (Chỉ LEADER, không được xóa chính LEADER)
+router.delete(
+  "/:id/members/:userId",
+  requireProjectMember,
+  requireLeader,
+  async (req, res, next) => {
+    try {
+      const targetUserId = Number(req.params.userId);
+      if (!Number.isInteger(targetUserId) || targetUserId <= 0) {
+        return res.status(400).json({ error: "ID thành viên không hợp lệ!" });
+      }
+
+      const membership = await prisma.projectMember.findUnique({
+        where: {
+          projectId_userId: {
+            projectId: req.project.id,
+            userId: targetUserId,
+          },
+        },
+      });
+
+      if (!membership) {
+        return res.status(404).json({ error: "Thành viên không thuộc dự án này!" });
+      }
+
+      if (membership.role === "LEADER") {
+        return res.status(400).json({ error: "Không thể xóa trưởng nhóm khỏi dự án!" });
+      }
+
+      await prisma.projectMember.delete({
+        where: {
+          projectId_userId: {
+            projectId: req.project.id,
+            userId: targetUserId,
+          },
+        },
+      });
+
+      res.json({ message: "Đã loại thành viên khỏi dự án!" });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
 
 export default router;
