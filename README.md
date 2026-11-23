@@ -112,3 +112,27 @@ Bash
 cd client
 npm run dev
 
+## Quy ước chung của nhóm (TaskFlow)
+
+6. Git
+Không push thẳng vào `main`. Mỗi người làm trên nhánh `feature/<tên>-<tính-năng>` (ví dụ: `feature/thu-quan-ly-du-an`).
+Muốn đưa code vào `main` thì mở **Pull Request** và cần ít nhất **1 người khác duyệt**.
+Commit đặt tên theo kiểu `<loại>: <mô tả ngắn>` (`feat`, `fix`, `docs`, `refactor`, `chore`).
+Không commit file `.env`, thư mục `node_modules` và `server/uploads`.
+
+7. Cơ sở dữ liệu
+Sửa schema bằng `npx prisma migrate dev --name <mô_tả_ngắn>` và commit luôn thư mục migration mới.
+Không sửa hay xóa migration cũ. Mỗi người dùng database PostgreSQL riêng trên máy mình.
+
+8. API và code
+Dữ liệu trao đổi là JSON; gửi token bằng header `Authorization: Bearer <token>`.
+Lỗi luôn trả dạng `{ "error": "thông báo tiếng Việt" }`; mã trạng thái `400`, `401`, `403`, `404`, `409` dùng đúng nghĩa.
+Luôn kiểm tra dữ liệu và quyền ở backend; không bao giờ trả `passwordHash` về trình duyệt.
+Tên biến, hàm, bảng, file dùng tiếng Anh; giao diện và thông báo lỗi dùng tiếng Việt.
+Frontend gọi API qua module `api.js` chung, không viết cứng địa chỉ `http://localhost:5000` trong component.
+Mỗi màn hình có đủ 3 trạng thái: **đang tải**, **lỗi**, **không có dữ liệu**. Xóa dữ liệu phải có hộp thoại xác nhận.
+
+9. Điều kiện để mở Pull Request
+Chạy được cả `client` và `server`, không có lỗi đỏ trong console.
+Đã tự thử luồng chính và ít nhất một trường hợp lỗi (sai quyền, dữ liệu trống, chưa đăng nhập).
+Nếu thêm hoặc đổi API thì cập nhật vào `docs/api.md`.
