@@ -41,7 +41,7 @@ function App() {
   const [editDeadline, setEditDeadline] = useState("");
   const [editSubmitting, setEditSubmitting] = useState(false);
 
-  // State Quản lý thành viên theo dự án
+  // State Quản lý thành viên, Chuyển quyền & Rời dự án
   const [expandedMembersProjectId, setExpandedMembersProjectId] = useState(null);
   const [memberEmail, setMemberEmail] = useState("");
   const [memberSubmitting, setMemberSubmitting] = useState(false);
@@ -257,6 +257,59 @@ function App() {
     }
   };
 
+  // Chuyển quyền trưởng nhóm cho thành viên (Nhiệm vụ 5)
+  const handleTransferLeader = async (projectId, targetMember) => {
+    const memberName = targetMember.user?.name || `ID ${targetMember.userId}`;
+    const confirmed = window.confirm(
+      `Bạn có chắc muốn chuyển quyền Trưởng nhóm (LEADER) cho "${memberName}"? Sau khi chuyển, bạn sẽ trở thành Thành viên (MEMBER).`
+    );
+    if (!confirmed) return;
+
+    setMemberSubmitting(true);
+    setMemberFeedback({ type: "", text: "" });
+    try {
+      const data = await apiRequest(`/projects/${projectId}/transfer-leader`, {
+        method: "PATCH",
+        body: JSON.stringify({ newLeaderId: targetMember.userId }),
+      });
+      setMemberFeedback({
+        type: "success",
+        text: data.message || "Chuyển quyền trưởng nhóm thành công!",
+      });
+      fetchProjects();
+    } catch (err) {
+      setMemberFeedback({ type: "error", text: err.message });
+    } finally {
+      setMemberSubmitting(false);
+    }
+  };
+
+  // Rời khỏi dự án (Nhiệm vụ 5 - LEADER sẽ bị chặn nếu chưa chuyển quyền)
+  const handleLeaveProject = async (project) => {
+    const confirmed = window.confirm(
+      `Bạn có chắc chắn muốn rời khỏi dự án "#${project.id} - ${project.name}"?`
+    );
+    if (!confirmed) return;
+
+    setMemberSubmitting(true);
+    setMemberFeedback({ type: "", text: "" });
+    try {
+      const data = await apiRequest(`/projects/${project.id}/leave`, {
+        method: "DELETE",
+      });
+      alert(data.message || "Bạn đã rời khỏi dự án!");
+      setExpandedMembersProjectId(null);
+      if (String(project.id) === String(selectedProjectId)) {
+        setSelectedProjectId("");
+      }
+      fetchProjects();
+    } catch (err) {
+      setMemberFeedback({ type: "error", text: err.message });
+    } finally {
+      setMemberSubmitting(false);
+    }
+  };
+
   const handleCreateTask = async (e) => {
     e.preventDefault();
     if (!selectedProjectId) {
@@ -358,7 +411,7 @@ function App() {
                 <strong>Chức năng 1:</strong> Đăng ký tài khoản người dùng (Lưu bảng <code>User</code>).
               </li>
               <li>
-                <strong>Chức năng 2:</strong> Tạo, sửa, xóa, quản lý thành viên và xem các dự án mình tham gia.
+                <strong>Chức năng 2:</strong> Tạo, sửa, xóa, quản lý thành viên, chuyển quyền và rời dự án.
               </li>
               <li>
                 <strong>Chức năng 3:</strong> Thêm và xem công việc theo từng dự án (Lưu bảng <code>Task</code>).
@@ -661,20 +714,30 @@ function App() {
                         </div>
                       </div>
 
-                      {/* Khu vực Danh sách & Quản lý thành viên */}
+                      {/* Khu vực Danh sách thành viên, Chuyển quyền & Rời dự án */}
                       {isMembersExpanded && (
                         <div className="mt-4 pt-4 border-t bg-gray-50 p-3 rounded">
-                          <div className="flex justify-between items-center mb-3">
+                          <div className="flex flex-wrap justify-between items-center gap-2 mb-3">
                             <h5 className="text-sm font-semibold text-gray-800">
                               Danh sách thành viên dự án ({p.members?.length || 0})
                             </h5>
-                            <button
-                              type="button"
-                              onClick={() => setExpandedMembersProjectId(null)}
-                              className="text-xs text-gray-500 hover:text-gray-800"
-                            >
-                              Thu gọn ▲
-                            </button>
+                            <div className="flex items-center gap-3">
+                              <button
+                                type="button"
+                                disabled={memberSubmitting}
+                                onClick={() => handleLeaveProject(p)}
+                                className="text-xs bg-orange-100 text-orange-800 px-2.5 py-1 rounded hover:bg-orange-200 font-medium disabled:opacity-50"
+                              >
+                                Rời dự án
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setExpandedMembersProjectId(null)}
+                                className="text-xs text-gray-500 hover:text-gray-800"
+                              >
+                                Thu gọn ▲
+                              </button>
+                            </div>
                           </div>
 
                           {/* Chỉ LEADER mới thấy form thêm thành viên */}
@@ -717,7 +780,7 @@ function App() {
                             {(p.members || []).map((m) => (
                               <div
                                 key={m.userId}
-                                className="flex justify-between items-center bg-white border px-3 py-2 rounded text-sm"
+                                className="flex flex-wrap justify-between items-center gap-2 bg-white border px-3 py-2 rounded text-sm"
                               >
                                 <div>
                                   <span className="font-medium text-gray-800">
@@ -727,7 +790,7 @@ function App() {
                                     ({m.user?.email || "N/A"} • ID: {m.userId})
                                   </span>
                                 </div>
-                                <div className="flex items-center gap-2">
+                                <div className="flex flex-wrap items-center gap-2">
                                   <span
                                     className={`text-xs px-2 py-0.5 rounded font-semibold ${
                                       m.role === "LEADER"
@@ -738,16 +801,26 @@ function App() {
                                     {m.role}
                                   </span>
 
-                                  {/* Chỉ LEADER mới thấy nút xóa và chỉ hiện ở các MEMBER */}
+                                  {/* Chỉ LEADER mới thấy nút Chuyển quyền và Loại bỏ ở các MEMBER */}
                                   {isLeader && m.role !== "LEADER" && (
-                                    <button
-                                      type="button"
-                                      disabled={memberSubmitting}
-                                      onClick={() => handleRemoveMember(p.id, m)}
-                                      className="text-xs bg-red-100 text-red-700 px-2.5 py-1 rounded hover:bg-red-200 font-medium disabled:opacity-50"
-                                    >
-                                      Loại bỏ
-                                    </button>
+                                    <>
+                                      <button
+                                        type="button"
+                                        disabled={memberSubmitting}
+                                        onClick={() => handleTransferLeader(p.id, m)}
+                                        className="text-xs bg-purple-100 text-purple-800 px-2.5 py-1 rounded hover:bg-purple-200 font-medium disabled:opacity-50"
+                                      >
+                                        Chuyển quyền
+                                      </button>
+                                      <button
+                                        type="button"
+                                        disabled={memberSubmitting}
+                                        onClick={() => handleRemoveMember(p.id, m)}
+                                        className="text-xs bg-red-100 text-red-700 px-2.5 py-1 rounded hover:bg-red-200 font-medium disabled:opacity-50"
+                                      >
+                                        Loại bỏ
+                                      </button>
+                                    </>
                                   )}
                                 </div>
                               </div>

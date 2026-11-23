@@ -232,7 +232,38 @@ Lưu ý: Không bao giờ trả về các trường `passwordHash`, `resetTokenH
   - `401`: `{"error": "Vui lòng đăng nhập để tiếp tục!"}`
   - `403`: `{"error": "Chỉ trưởng nhóm (LEADER) mới có quyền thực hiện thao tác này!"}`
   - `404`: `{"error": "Thành viên không thuộc dự án này!"}` hoặc `{"error": "Không tìm thấy dự án!"}`
+### Chuyển quyền trưởng nhóm (`PATCH /api/projects/:id/transfer-leader`)
+- Quyền hạn: Yêu cầu đăng nhập (`requireAuth`), là thành viên dự án (`requireProjectMember`) và phải là Trưởng nhóm (`requireLeader`).
+- Request Body:
+  ```json
+  {
+    "newLeaderId": 2
+  }
+  ```
+- Response thành công (`200 OK`):
+  ```json
+  {
+    "message": "Đã chuyển quyền trưởng nhóm cho Trần Văn B!"
+  }
+  ```
+- Mã lỗi:
+  - `400`: `{"error": "Vui lòng chọn thành viên nhận quyền hợp lệ!"}` hoặc `{"error": "Bạn đã là trưởng nhóm của dự án này!"}`
+  - `401`: `{"error": "Vui lòng đăng nhập để tiếp tục!"}`
+  - `403`: `{"error": "Chỉ trưởng nhóm (LEADER) mới có quyền thực hiện thao tác này!"}`
+  - `404`: `{"error": "Người được chuyển quyền phải là thành viên của dự án!"}`
 
+### Rời khỏi dự án (`DELETE /api/projects/:id/leave`)
+- Quyền hạn: Yêu cầu đăng nhập (`requireAuth`) và là thành viên dự án (`requireProjectMember`). Trưởng nhóm (`LEADER`) không được rời dự án khi chưa chuyển quyền.
+- Response thành công (`200 OK`):
+  ```json
+  {
+    "message": "Bạn đã rời khỏi dự án!"
+  }
+  ```
+- Mã lỗi:
+  - `400`: `{"error": "Trưởng nhóm không thể rời dự án khi chưa chuyển quyền cho thành viên khác!"}`
+  - `401`: `{"error": "Vui lòng đăng nhập để tiếp tục!"}`
+  - `403`: `{"error": "Bạn không phải là thành viên của dự án này!"}`
 ---
 ## 4. Công việc (`Task`)
 - Trạng thái (`status`): `"TODO"` | `"IN_PROGRESS"` | `"DONE"`

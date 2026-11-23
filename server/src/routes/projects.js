@@ -322,4 +322,93 @@ router.delete(
   }
 );
 
+// 8. Chuyển quyền trưởng nhóm cho thành viên khác (Chỉ LEADER)
+router.patch(
+  "/:id/transfer-leader",
+  requireProjectMember,
+  requireLeader,
+  async (req, res, next) => {
+    try {
+      const newLeaderId = Number(req.body?.newLeaderId);
+      if (!Number.isInteger(newLeaderId) || newLeaderId <= 0) {
+        return res.status(400).json({ error: "Vui lòng chọn thành viên nhận quyền hợp lệ!" });
+      }
+
+      if (newLeaderId === req.projectMember.userId) {
+        return res.status(400).json({ error: "Bạn đã là trưởng nhóm của dự án này!" });
+      }
+
+      const targetMembership = await prisma.projectMember.findUnique({
+        where: {
+          projectId_userId: {
+            projectId: req.project.id,
+            userId: newLeaderId,
+          },
+        },
+        include: {
+          user: { select: safeUserSelect },
+        },
+      });
+
+      if (!targetMembership) {
+        return res
+          .status(404)
+          .json({ error: "Người được chuyển quyền phải là thành viên của dự án!" });
+      }
+
+      // Dùng transaction để đảm bảo dự án luôn có đúng 1 LEADER
+      await prisma.$transaction([
+        prisma.projectMember.update({
+          where: {
+            projectId_userId: {
+              projectId: req.project.id,
+              userId: req.projectMember.userId,
+            },
+          },
+          data: { role: "MEMBER" },
+        }),
+        prisma.projectMember.update({
+          where: {
+            projectId_userId: {
+              projectId: req.project.id,
+              userId: newLeaderId,
+            },
+          },
+          data: { role: "LEADER" },
+        }),
+      ]);
+
+      res.json({
+        message: `Đã chuyển quyền trưởng nhóm cho ${targetMembership.user.name}!`,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// 9. Tự rời khỏi dự án (LEADER không thể rời nếu chưa chuyển quyền)
+router.delete("/:id/leave", requireProjectMember, async (req, res, next) => {
+  try {
+    if (req.projectMember.role === "LEADER") {
+      return res.status(400).json({
+        error: "Trưởng nhóm không thể rời dự án khi chưa chuyển quyền cho thành viên khác!",
+      });
+    }
+
+    await prisma.projectMember.delete({
+      where: {
+        projectId_userId: {
+          projectId: req.project.id,
+          userId: req.projectMember.userId,
+        },
+      },
+    });
+
+    res.json({ message: "Bạn đã rời khỏi dự án!" });
+  } catch (error) {
+    next(error);
+  }
+});
+
 export default router;
