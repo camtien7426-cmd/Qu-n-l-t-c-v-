@@ -15,7 +15,6 @@
   }
   ```
   | Mã HTTP | Ý nghĩa | Ví dụ thông báo |
-  |---|---|---|
   | `400` | Dữ liệu đầu vào không hợp lệ / thiếu trường | `{"error": "Tên dự án không được để trống!"}` |
   | `401` | Chưa đăng nhập hoặc token hết hạn | `{"error": "Phiên đăng nhập không hợp lệ hoặc đã hết hạn!"}` |
   | `403` | Không đủ quyền (ví dụ MEMBER thực hiện lệnh của LEADER) | `{"error": "Chỉ trưởng nhóm (LEADER) mới có quyền thực hiện thao tác này!"}` |
@@ -58,7 +57,7 @@ Lưu ý: Không bao giờ trả về các trường `passwordHash`, `resetTokenH
 ---
 
 ## 3. Dự án (`Project` & `ProjectMember`)
-Giá trị `role` trong dự án: `"LEADER"` | `"MEMBER"` (mỗi dự án chỉ có 1 `LEADER`).*
+*Giá trị `role` trong dự án: `"LEADER"` | `"MEMBER"` (mỗi dự án chỉ có 1 `LEADER`).*
 
 ### Danh sách dự án (`GET /api/projects`)
 ```json
@@ -115,8 +114,157 @@ Giá trị `role` trong dự án: `"LEADER"` | `"MEMBER"` (mỗi dự án chỉ 
 }
 ```
 
----
+### Tạo dự án mới (`POST /api/projects`)
+- Quyền hạn: Yêu cầu đăng nhập (`requireAuth`). Người tạo tự động trở thành `LEADER` của dự án.
+- Request Body:
+  ```json
+  {
+    "name": "Ứng dụng quản lý tác vụ TaskFlow",
+    "description": "Đồ án môn Công nghệ phần mềm",
+    "deadline": "2026-12-15T23:59:59.000Z"
+  }
+  ```
+  *(Trường `description` và `deadline` có thể bỏ trống hoặc truyền `null`).*
+- Response thành công (`201 Created`):
+  ```json
+  {
+    "message": "Tạo dự án thành công!",
+    "project": {
+      "id": 1,
+      "name": "Ứng dụng quản lý tác vụ TaskFlow",
+      "description": "Đồ án môn Công nghệ phần mềm",
+      "deadline": "2026-12-15T23:59:59.000Z",
+      "createdAt": "2026-11-22T15:10:00.000Z",
+      "updatedAt": "2026-11-22T15:10:00.000Z",
+      "members": [
+        {
+          "projectId": 1,
+          "userId": 1,
+          "role": "LEADER",
+          "joinedAt": "2026-11-22T15:10:00.000Z",
+          "user": {
+            "id": 1,
+            "name": "Nguyễn Thị Anh Thư",
+            "email": "anhthu@example.com",
+            "avatarUrl": null
+          }
+        }
+      ],
+      "_count": {
+        "tasks": 0
+      }
+    }
+  }
+  ```
 
+### Cập nhật thông tin dự án (`PUT /api/projects/:id`)
+- Quyền hạn: Yêu cầu đăng nhập (`requireAuth`), là thành viên dự án (`requireProjectMember`) và phải là Trưởng nhóm (`requireLeader`).
+- Request Body (truyền các trường cần sửa; truyền `deadline: null` nếu muốn xóa thời hạn):
+  ```json
+  {
+    "name": "Tên dự án đã cập nhật",
+    "description": "Mô tả mới",
+    "deadline": "2026-12-20T23:59:59.000Z"
+  }
+  ```
+- Response thành công (`200 OK`):
+  ```json
+  {
+    "message": "Cập nhật dự án thành công!",
+    "project": {
+      "id": 1,
+      "name": "Tên dự án đã cập nhật",
+      "description": "Mô tả mới",
+      "deadline": "2026-12-20T23:59:59.000Z",
+      "createdAt": "2026-11-22T15:10:00.000Z",
+      "updatedAt": "2026-11-23T00:15:00.000Z",
+      "members": [...],
+      "_count": {
+        "tasks": 0
+      }
+    }
+  }
+  ```
+
+### Thêm thành viên vào dự án (`POST /api/projects/:id/members`)
+- Quyền hạn: Yêu cầu đăng nhập (`requireAuth`), là thành viên dự án (`requireProjectMember`) và phải là Trưởng nhóm (`requireLeader`).
+- Request Body:
+  ```json
+  {
+    "email": "vanb@example.com"
+  }
+  ```
+- Response thành công (`201 Created`):
+  ```json
+  {
+    "message": "Thêm thành viên thành công!",
+    "member": {
+      "projectId": 1,
+      "userId": 2,
+      "role": "MEMBER",
+      "joinedAt": "2026-11-23T13:30:00.000Z",
+      "user": {
+        "id": 2,
+        "name": "Trần Văn B",
+        "email": "vanb@example.com",
+        "avatarUrl": null
+      }
+    }
+  }
+  ```
+- Mã lỗi:
+  - `400`: `{"error": "Email thành viên không được để trống!"}`
+  - `401`: `{"error": "Vui lòng đăng nhập để tiếp tục!"}`
+  - `403`: `{"error": "Chỉ trưởng nhóm (LEADER) mới có quyền thực hiện thao tác này!"}`
+  - `404`: `{"error": "Không tìm thấy người dùng với email này!"}` hoặc `{"error": "Không tìm thấy dự án!"}`
+  - `409`: `{"error": "Người dùng này đã là thành viên của dự án!"}`
+
+### Xóa thành viên khỏi dự án (`DELETE /api/projects/:id/members/:userId`)
+- Quyền hạn: Yêu cầu đăng nhập (`requireAuth`), là thành viên dự án (`requireProjectMember`) và phải là Trưởng nhóm (`requireLeader`).
+- Response thành công (`200 OK`):
+  ```json
+  {
+    "message": "Đã loại thành viên khỏi dự án!"
+  }
+  ```
+- Mã lỗi:
+  - `400`: `{"error": "Không thể xóa trưởng nhóm khỏi dự án!"}`
+  - `401`: `{"error": "Vui lòng đăng nhập để tiếp tục!"}`
+  - `403`: `{"error": "Chỉ trưởng nhóm (LEADER) mới có quyền thực hiện thao tác này!"}`
+  - `404`: `{"error": "Thành viên không thuộc dự án này!"}` hoặc `{"error": "Không tìm thấy dự án!"}`
+### Chuyển quyền trưởng nhóm (`PATCH /api/projects/:id/transfer-leader`)
+- Quyền hạn: Yêu cầu đăng nhập (`requireAuth`), là thành viên dự án (`requireProjectMember`) và phải là Trưởng nhóm (`requireLeader`).
+- Request Body:
+  ```json
+  {
+    "newLeaderId": 2
+  }
+  ```
+- Response thành công (`200 OK`):
+  ```json
+  {
+    "message": "Đã chuyển quyền trưởng nhóm cho Trần Văn B!"
+  }
+  ```
+- Mã lỗi:
+  - `400`: `{"error": "Vui lòng chọn thành viên nhận quyền hợp lệ!"}` hoặc `{"error": "Bạn đã là trưởng nhóm của dự án này!"}`
+  - `401`: `{"error": "Vui lòng đăng nhập để tiếp tục!"}`
+  - `403`: `{"error": "Chỉ trưởng nhóm (LEADER) mới có quyền thực hiện thao tác này!"}`
+  - `404`: `{"error": "Người được chuyển quyền phải là thành viên của dự án!"}`
+
+### Rời khỏi dự án (`DELETE /api/projects/:id/leave`)
+- Quyền hạn: Yêu cầu đăng nhập (`requireAuth`) và là thành viên dự án (`requireProjectMember`). Trưởng nhóm (`LEADER`) không được rời dự án khi chưa chuyển quyền.
+- Response thành công (`200 OK`):
+  ```json
+  {
+    "message": "Bạn đã rời khỏi dự án!"
+  }
+  ```
+- Mã lỗi:
+  - `400`: `{"error": "Trưởng nhóm không thể rời dự án khi chưa chuyển quyền cho thành viên khác!"}`
+  - `401`: `{"error": "Vui lòng đăng nhập để tiếp tục!"}`
+  - `403`: `{"error": "Bạn không phải là thành viên của dự án này!"}`
+---
 ## 4. Công việc (`Task`)
 - Trạng thái (`status`): `"TODO"` | `"IN_PROGRESS"` | `"DONE"`
 - Độ ưu tiên (`priority`): `"LOW"` | `"MEDIUM"` | `"HIGH"`
@@ -154,47 +302,11 @@ Giá trị `role` trong dự án: `"LEADER"` | `"MEMBER"` (mỗi dự án chỉ 
       "assigneeId": 2,
       "parentId": 10,
       "createdAt": "2026-11-22T16:10:00.000Z",
-      "updatedAt": "2026-11-22T16:10:00.000Z",
-      "assignee": { "id": 2, "name": "Trần Văn B", "email": "vanb@example.com", "avatarUrl": null }
+      "updatedAt": "2026-11-22T16:10:00.000Z"
     }
-  ],
-"subtaskProgress": { "done": 0, "total": 1 }
-}
-
-
-```
-### Danh sách API công việc
-
-Tạm thời gửi header `X-User-Id: <id>` thay cho `Authorization` cho đến khi có đăng nhập thật.
-
-| Phương thức | Đường dẫn | Quyền | Mô tả |
-|---|---|---|---|
-| GET | `/api/projects/:projectId/tasks` | Thành viên dự án | Danh sách công việc chính (kèm `subtasks`, `subtaskProgress`), mới nhất trước |
-| POST | `/api/tasks` | `LEADER` | Tạo công việc, trả `201` kèm Task |
-| GET | `/api/tasks/:id` | Thành viên dự án | Chi tiết một công việc |
-| PATCH | `/api/tasks/:id` | `LEADER`: mọi trường; `MEMBER`: chỉ `status` của việc được giao cho mình | Sửa công việc, trả Task |
-| DELETE | `/api/tasks/:id` | `LEADER` | Xóa kèm công việc con và bình luận, trả `{ "message": "Đã xóa công việc." }` |
-| POST | `/api/tasks/:id/subtasks` | `LEADER` | Tạo công việc con (chỉ 1 cấp), trả `201` kèm Task con (không có `subtasks`) |
-
-Dữ liệu gửi lên khi tạo hoặc sửa (khi sửa chỉ cần gửi trường muốn đổi):
-
-```json
-{
-  "projectId": 1,
-  "title": "Thiết kế trang đăng nhập",
-  "description": null,
-  "assigneeId": 2,
-  "dueDate": "2026-11-28",
-  "priority": "HIGH",
-  "status": "TODO"
+  ]
 }
 ```
-
-- `title`: bắt buộc khi tạo, tối đa 200 ký tự.
-- `assigneeId`: phải là thành viên của dự án, hoặc `null` nếu chưa giao.
-- `dueDate`: `"YYYY-MM-DD"` hoặc ISO 8601, `null` nếu không đặt.
-- Công việc cha có thêm `"subtaskProgress": { "done": 1, "total": 3 }`; mỗi công việc con trong `subtasks` có thêm `assignee`.
-- Lỗi: `400` dữ liệu sai, `401` chưa đăng nhập, `403` không đủ quyền, `404` không tìm thấy.
 
 ---
 
@@ -225,4 +337,35 @@ Dữ liệu gửi lên khi tạo hoặc sửa (khi sửa chỉ cần gửi trư�
     "createdAt": "2026-11-24T17:00:00.000Z"
   }
 ]
+```
+---
+
+## 6. Middleware phân quyền dự án dùng chung
+*File khai báo:* `server/src/middleware/projectAuth.js`
+
+Gồm 2 hàm kiểm tra quyền theo từng dự án (`requireProjectMember` và `requireLeader`). **Lưu ý:** Luôn đặt sau middleware xác thực đăng nhập (`requireAuth`) để có sẵn `req.user`.
+
+### Cách hoạt động
+`requireProjectMember`**: Kiểm tra người dùng hiện tại có nằm trong bảng `ProjectMember` của dự án hay không (`LEADER` hoặc `MEMBER`). Hàm tự động tìm `projectId` từ:
+  - `req.params.projectId` (ví dụ: `/api/projects/:projectId/tasks`)
+  - `req.params.id` trên route `/api/projects/:id`
+  - `req.body.projectId` (ví dụ: `POST /api/tasks`)
+  - `taskId` hoặc `id` trên route công việc (ví dụ: `/api/tasks/:id`, `/api/tasks/:taskId/comments`)
+  - `commentId` hoặc `id` trên route bình luận (ví dụ: `/api/comments/:id`)
+  - Sau khi kiểm tra hợp lệ, middleware gắn sẵn `req.project` và `req.projectMember` để controller phía sau dùng lại.
+`requireLeader`**: Kiểm tra vai trò của thành viên trong dự án phải là `"LEADER"`. Nếu thiếu quyền sẽ trả về mã `403` kèm `{ "error": "Chỉ trưởng nhóm (LEADER) mới có quyền thực hiện thao tác này!" }`.
+
+### Ví dụ áp dụng trong các file Route
+```javascript
+import { requireProjectMember, requireLeader } from "../middleware/projectAuth.js";
+
+// 1. Thao tác dành cho mọi thành viên dự án (LEADER & MEMBER)
+router.get("/projects/:projectId/tasks", requireAuth, requireProjectMember, ...);
+router.post("/tasks", requireAuth, requireProjectMember, ...);
+router.patch("/tasks/:id", requireAuth, requireProjectMember, ...);
+router.post("/tasks/:taskId/comments", requireAuth, requireProjectMember, ...);
+
+// 2. Thao tác chỉ dành cho Trưởng nhóm (LEADER)
+router.put("/projects/:id", requireAuth, requireProjectMember, requireLeader, ...);
+router.delete("/projects/:id", requireAuth, requireProjectMember, requireLeader, ...);
 ```
