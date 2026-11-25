@@ -1,17 +1,23 @@
 import express from 'express';
 import { prisma } from '../lib/prisma.js';
+import { buildTaskListQuery } from '../utils/taskQuery.js';
+import { requireProjectMember } from '../middleware/projectAuth.js';
 
 const router = express.Router();
 
 const VALID_STATUS = ['TODO', 'IN_PROGRESS', 'DONE'];
 const VALID_PRIORITY = ['LOW', 'MEDIUM', 'HIGH'];
 
-// 4. API Lấy danh sách công việc của dự án
-router.get('/projects/:projectId/tasks', async (req, res) => {
+// 4. API Lấy danh sách công việc của dự án (có thể tìm theo tiêu đề: ?q=...)
+router.get('/projects/:projectId/tasks', requireProjectMember, async (req, res) => {
   try {
     const projectId = parseInt(req.params.projectId);
+
+    const { where, error } = buildTaskListQuery(req.query);
+    if (error) return res.status(400).json({ error });
+
     const tasks = await prisma.task.findMany({
-      where: { projectId, parentId: null },
+      where: { projectId, parentId: null, ...where },
       include: { subtasks: true, assignee: true },
       orderBy: { createdAt: 'desc' },
     });
