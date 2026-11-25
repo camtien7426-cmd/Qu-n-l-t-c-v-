@@ -1,8 +1,8 @@
 # Đặc tả định dạng JSON API - TaskFlow
 
 ## 1. Quy ước chung
-- Base URL:** `http://localhost:5000/api`
-- Xác thực (Authentication):** Các API yêu cầu đăng nhập gửi kèm header:
+- **Base URL:** `http://localhost:5000/api`
+- **Xác thực (Authentication):** Các API yêu cầu đăng nhập gửi kèm header:
   ```http
   Authorization: Bearer <token>
   ```
@@ -25,7 +25,7 @@
 ---
 
 ## 2. Người dùng (`User`)
-Lưu ý: Không bao giờ trả về các trường `passwordHash`, `resetTokenHash`, `resetTokenExpires`.*
+*Lưu ý: Không bao giờ trả về các trường `passwordHash`, `resetTokenHash`, `resetTokenExpires`.*
 
 ### Đối tượng User cơ bản
 ```json
@@ -156,7 +156,6 @@ Lưu ý: Không bao giờ trả về các trường `passwordHash`, `resetTokenH
     }
   }
   ```
-
 ### Cập nhật thông tin dự án (`PUT /api/projects/:id`)
 - Quyền hạn: Yêu cầu đăng nhập (`requireAuth`), là thành viên dự án (`requireProjectMember`) và phải là Trưởng nhóm (`requireLeader`).
 - Request Body (truyền các trường cần sửa; truyền `deadline: null` nếu muốn xóa thời hạn):
@@ -304,7 +303,35 @@ Lưu ý: Không bao giờ trả về các trường `passwordHash`, `resetTokenH
       "createdAt": "2026-11-22T16:10:00.000Z",
       "updatedAt": "2026-11-22T16:10:00.000Z"
     }
-  ]
+  ],
+  "subtaskProgress": { "done": 0, "total": 1 }
+}
+```
+
+### Danh sách API công việc
+
+Tạm thời gửi header `X-User-Id: <id>` thay cho `Authorization` cho đến khi có đăng nhập thật.
+
+| Phương thức | Đường dẫn | Quyền | Mô tả |
+|---|---|---|---|
+| GET | `/api/projects/:projectId/tasks` | Thành viên dự án | Danh sách công việc chính (kèm `subtasks`, `subtaskProgress`), mới nhất trước |
+| POST | `/api/tasks` | `LEADER` | Tạo công việc, trả `201` kèm Task |
+| GET | `/api/tasks/:id` | Thành viên dự án | Chi tiết một công việc |
+| PATCH | `/api/tasks/:id` | `LEADER`: mọi trường; `MEMBER`: chỉ `status` của việc được giao cho mình | Sửa công việc, trả Task |
+| DELETE | `/api/tasks/:id` | `LEADER` | Xóa kèm công việc con và bình luận, trả `{ "message": "Đã xóa công việc." }` |
+| POST | `/api/tasks/:id/subtasks` | `LEADER` | Tạo công việc con (chỉ 1 cấp), trả `201` kèm Task con (không có `subtasks`) |
+
+Dữ liệu gửi lên khi tạo hoặc sửa (khi sửa chỉ cần gửi trường muốn đổi):
+
+```json
+{
+  "projectId": 1,
+  "title": "Thiết kế trang đăng nhập",
+  "description": null,
+  "assigneeId": 2,
+  "dueDate": "2026-11-28",
+  "priority": "HIGH",
+  "status": "TODO"
 }
 ```
 
@@ -338,22 +365,22 @@ Lưu ý: Không bao giờ trả về các trường `passwordHash`, `resetTokenH
   }
 ]
 ```
----
-
+----
 ## 6. Middleware phân quyền dự án dùng chung
 *File khai báo:* `server/src/middleware/projectAuth.js`
-
-Gồm 2 hàm kiểm tra quyền theo từng dự án (`requireProjectMember` và `requireLeader`). **Lưu ý:** Luôn đặt sau middleware xác thực đăng nhập (`requireAuth`) để có sẵn `req.user`.
+Gồm 2 hàm kiểm tra quyền theo từng dự án (`requireProjectMember` và `requireLeader`). **Lưu ý:** Luôn đặt sau middleware xác thực đăng nhập (`requireAuth`) để có sẵn `req.user`. Trong lúc chưa có `requireAuth`, middleware tạm đọc header `X-User-Id`.
 
 ### Cách hoạt động
-`requireProjectMember`**: Kiểm tra người dùng hiện tại có nằm trong bảng `ProjectMember` của dự án hay không (`LEADER` hoặc `MEMBER`). Hàm tự động tìm `projectId` từ:
-  - `req.params.projectId` (ví dụ: `/api/projects/:projectId/tasks`)
-  - `req.params.id` trên route `/api/projects/:id`
-  - `req.body.projectId` (ví dụ: `POST /api/tasks`)
-  - `taskId` hoặc `id` trên route công việc (ví dụ: `/api/tasks/:id`, `/api/tasks/:taskId/comments`)
-  - `commentId` hoặc `id` trên route bình luận (ví dụ: `/api/comments/:id`)
-  - Sau khi kiểm tra hợp lệ, middleware gắn sẵn `req.project` và `req.projectMember` để controller phía sau dùng lại.
-`requireLeader`**: Kiểm tra vai trò của thành viên trong dự án phải là `"LEADER"`. Nếu thiếu quyền sẽ trả về mã `403` kèm `{ "error": "Chỉ trưởng nhóm (LEADER) mới có quyền thực hiện thao tác này!" }`.
+**`requireProjectMember`**: Kiểm tra người dùng hiện tại có nằm trong bảng `ProjectMember` của dự án hay không (`LEADER` hoặc `MEMBER`). Hàm tự động tìm `projectId` theo thứ tự ưu tiên sau (mã trên URL luôn thắng `req.body`):
+  1. `req.params.projectId` (ví dụ: `/api/projects/:projectId/tasks`)
+  2. `req.params.id` trên route `/api/projects/:id`
+  3. `taskId` hoặc `id` trên route công việc (ví dụ: `/api/tasks/:id`, `/api/tasks/:taskId/comments`)
+  4. `commentId` hoặc `id` trên route bình luận (ví dụ: `/api/comments/:id`)
+  5. `req.body.projectId`, chỉ khi URL không có mã nào ở trên (ví dụ: `POST /api/tasks`)
+
+  Sau khi kiểm tra hợp lệ, middleware gắn sẵn `req.project` và `req.projectMember` để controller phía sau dùng lại.
+
+**`requireLeader`**: Kiểm tra vai trò của thành viên trong dự án phải là `"LEADER"`. Nếu thiếu quyền sẽ trả về mã `403` kèm `{ "error": "Chỉ trưởng nhóm (LEADER) mới có quyền thực hiện thao tác này!" }`.
 
 ### Ví dụ áp dụng trong các file Route
 ```javascript
@@ -368,4 +395,3 @@ router.post("/tasks/:taskId/comments", requireAuth, requireProjectMember, ...);
 // 2. Thao tác chỉ dành cho Trưởng nhóm (LEADER)
 router.put("/projects/:id", requireAuth, requireProjectMember, requireLeader, ...);
 router.delete("/projects/:id", requireAuth, requireProjectMember, requireLeader, ...);
-```
