@@ -1,6 +1,7 @@
 import express from "express";
 import cors from "cors";
 import { env } from "./config/env.js";
+import { requireAuth } from "./middleware/requireAuth.js";
 
 import healthRoutes from "./routes/health.js";
 import authRoutes from "./routes/auth.js";
@@ -14,7 +15,14 @@ const app = express();
 
 app.use(cors({ origin: env.clientOrigin }));
 app.use(express.json());
-app.use("/uploads", express.static("uploads"));
+app.use("/uploads", express.static(env.uploadsDir));
+
+// Chặn người chưa đăng nhập ở một chỗ duy nhất cho mọi API cần bảo vệ (cả nhóm dùng chung).
+// /api/health và /api/auth tự quản lý quyền truy cập của chúng nên không nằm trong danh sách này.
+app.use(
+  ["/api/projects", "/api/tasks", "/api/comments", "/api/notifications", "/api/stats"],
+  requireAuth
+);
 
 // Gắn các route theo tính năng
 app.use("/api/health", healthRoutes);

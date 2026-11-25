@@ -1,0 +1,14 @@
+import jwt from "jsonwebtoken";
+import { env } from "../config/env.js";
+
+// Token chỉ chứa id người dùng; hạn dùng lấy từ JWT_EXPIRES_IN (mặc định 1 ngày)
+export function signToken(userId) {
+  return jwt.sign({ sub: String(userId) }, env.jwtSecret, {
+    expiresIn: env.jwtExpiresIn,
+  });
+}
+
+// Trả về payload nếu hợp lệ, ném lỗi nếu sai chữ ký hoặc hết hạn
+export function verifyToken(token) {
+  return jwt.verify(token, env.jwtSecret);
+}

@@ -1,5 +1,6 @@
 import express from 'express';
 import { prisma } from '../lib/prisma.js';
+import { memberUserSelect } from '../lib/user.js';
 
 const router = express.Router();
 
@@ -12,7 +13,10 @@ router.get('/projects/:projectId/tasks', async (req, res) => {
     const projectId = parseInt(req.params.projectId);
     const tasks = await prisma.task.findMany({
       where: { projectId, parentId: null },
-      include: { subtasks: true, assignee: true },
+      include: {
+        subtasks: true,
+        assignee: { select: memberUserSelect },
+      },
       orderBy: { createdAt: 'desc' },
     });
     res.json(tasks);

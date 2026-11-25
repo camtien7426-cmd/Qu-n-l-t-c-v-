@@ -1,5 +1,6 @@
 import express from 'express';
 import { prisma } from '../lib/prisma.js';
+import { memberUserSelect } from '../lib/user.js';
 
 const router = express.Router();
 
@@ -9,7 +10,7 @@ router.get('/', async (req, res) => {
     const projects = await prisma.project.findMany({
       include: {
         members: {
-          include: { user: true },
+          include: { user: { select: memberUserSelect } },
         },
         _count: {
           select: { tasks: true },
@@ -26,20 +27,20 @@ router.get('/', async (req, res) => {
 // 3. API Tạo dự án mới
 router.post('/', async (req, res) => {
   try {
-    const { name, description, leaderId } = req.body;
+    const { name, description } = req.body;
     const project = await prisma.project.create({
       data: {
         name,
         description,
         members: {
           create: {
-            userId: parseInt(leaderId),
+            userId: req.user.id, // trưởng nhóm luôn là người đang đăng nhập
             role: 'LEADER',
           },
         },
       },
       include: {
-        members: { include: { user: true } },
+        members: { include: { user: { select: memberUserSelect } } },
       },
     });
     res.json({ message: 'Tạo dự án thành công!', project });

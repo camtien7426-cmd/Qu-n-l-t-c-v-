@@ -1,3 +1,33 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer base {
+  html {
+    @apply font-sans;
+  }
+  body {
+    @apply bg-slate-50 text-slate-800 antialiased;
+  }
+  /* Người dùng bật "giảm chuyển động" thì tắt hiệu ứng */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
+
+@layer components {
+  .input {
+    @apply block w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm text-slate-900 shadow-sm transition placeholder:text-slate-400 focus:border-brand-500 focus:outline-none focus:ring-4 focus:ring-brand-500/15 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500;
+  }
+  .input-error {
+    @apply border-rose-400 focus:border-rose-500 focus:ring-rose-500/15;
+  }
+  .card {
+    @apply rounded-2xl border border-slate-200 bg-white shadow-soft;
+  }
+}
