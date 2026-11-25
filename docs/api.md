@@ -411,3 +411,81 @@ router.post("/tasks/:taskId/comments", requireAuth, requireProjectMember, ...);
 router.put("/projects/:id", requireAuth, requireProjectMember, requireLeader, ...);
 router.delete("/projects/:id", requireAuth, requireProjectMember, requireLeader, ...);
 ```
+
+
+---
+
+## Thống kê (`/api/stats`) — Người 2
+
+*Tất cả API yêu cầu đăng nhập. Quy ước: chỉ tính **công việc chính** (không tính công việc con); "quá hạn" = có hạn đã qua và chưa hoàn thành.*
+
+### Bảng điều khiển (`GET /api/stats/dashboard`)
+Tổng hợp trong các dự án mà người dùng tham gia.
+```json
+{ "total": 14, "todo": 4, "inProgress": 5, "done": 5, "overdue": 2 }
+```
+
+### Dự án gần đây (`GET /api/stats/recent-projects`)
+Tối đa 5 dự án mới cập nhật gần nhất.
+```json
+[
+  {
+    "id": 1,
+    "name": "Ứng dụng quản lý tác vụ TaskFlow",
+    "description": null,
+    "deadline": "2026-12-15T23:59:59.000Z",
+    "updatedAt": "2026-11-25T08:00:00.000Z",
+    "role": "LEADER",
+    "taskCount": 10,
+    "doneCount": 4,
+    "overdueCount": 2,
+    "completionPercent": 40
+  }
+]
+```
+
+### Việc sắp đến hạn (`GET /api/stats/upcoming-tasks`)
+Việc chưa hoàn thành có hạn trong 48 giờ tới, sắp xếp theo hạn tăng dần (tối đa 20).
+```json
+[
+  {
+    "id": 7,
+    "title": "Nộp báo cáo tuần 3",
+    "status": "IN_PROGRESS",
+    "priority": "HIGH",
+    "dueDate": "2026-11-26T09:00:00.000Z",
+    "project": { "id": 1, "name": "Ứng dụng quản lý tác vụ TaskFlow" },
+    "assignee": { "id": 2, "name": "Trần Văn B" }
+  }
+]
+```
+
+### Thống kê một dự án (`GET /api/stats/projects/:projectId`)
+- Quyền: thành viên dự án (`403` nếu không phải thành viên, `404` nếu không có dự án).
+```json
+{
+  "project": { "id": 1, "name": "Ứng dụng quản lý tác vụ TaskFlow", "deadline": null },
+  "myRole": "LEADER",
+  "total": 10,
+  "byStatus": { "TODO": 3, "IN_PROGRESS": 3, "DONE": 4 },
+  "completionPercent": 40,
+  "overdue": 2
+}
+```
+
+### Tiến độ từng thành viên (`GET /api/stats/projects/:projectId/members`)
+- Quyền: **chỉ trưởng nhóm** (`403` với thành viên thường). Tính theo công việc chính được giao cho từng người.
+```json
+[
+  {
+    "user": { "id": 1, "name": "Nguyễn Thị Anh Thư", "email": "anhthu@example.com", "avatarUrl": null },
+    "role": "LEADER",
+    "total": 4,
+    "todo": 1,
+    "inProgress": 1,
+    "done": 2,
+    "overdue": 1,
+    "completionPercent": 50
+  }
+]
+```
