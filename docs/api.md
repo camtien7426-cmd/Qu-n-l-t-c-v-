@@ -320,7 +320,7 @@ Tạm thời gửi header `X-User-Id: <id>` thay cho `Authorization` cho đến 
 
 | Phương thức | Đường dẫn | Quyền | Mô tả |
 |---|---|---|---|
-| GET | `/api/projects/:projectId/tasks` | Thành viên dự án | Danh sách công việc chính (kèm `subtasks`, `subtaskProgress`), mới nhất trước |
+| GET | `/api/projects/:projectId/tasks` | Thành viên dự án | Danh sách công việc chính (kèm `subtasks`, `subtaskProgress`), mới nhất trước. Query tùy chọn: `q` (tìm theo tiêu đề, không phân biệt hoa thường, tối đa 200 ký tự; sai kiểu hoặc quá dài trả `400`) |
 | POST | `/api/tasks` | `LEADER` | Tạo công việc, trả `201` kèm Task |
 | GET | `/api/tasks/:id` | Thành viên dự án | Chi tiết một công việc |
 | PATCH | `/api/tasks/:id` | `LEADER`: mọi trường; `MEMBER`: chỉ `status` của việc được giao cho mình | Sửa công việc, trả Task |
