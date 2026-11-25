@@ -1,18 +1,19 @@
 import { prisma } from "../lib/prisma.js";
 
 /**
- * Tự động tìm projectId từ request (hỗ trợ cả route dự án, công việc và bình luận)
+ * Tự động tìm projectId từ request (hỗ trợ cả route dự án, công việc và bình luận).
+ *
+ * Thứ tự ưu tiên (quan trọng cho bảo mật): mã trên URL luôn thắng req.body.projectId.
+ * Nếu body được ưu tiên, người dùng có thể gửi projectId của dự án mình để thao tác
+ * trên công việc/bình luận của dự án khác.
  */
 async function resolveProjectId(req) {
-  // 1. Route có sẵn projectId trên URL hoặc body (VD: /projects/:projectId/tasks, POST /tasks)
+  // 1. Route có sẵn projectId trên URL (VD: /projects/:projectId/tasks, /projects/:id)
   if (req.params.projectId !== undefined) {
     return { projectId: Number(req.params.projectId) };
   }
   if (req.baseUrl?.endsWith("/projects") && req.params.id !== undefined) {
     return { projectId: Number(req.params.id) };
-  }
-  if (req.body?.projectId !== undefined) {
-    return { projectId: Number(req.body.projectId) };
   }
 
   // 2. Route thao tác trên công việc (VD: /tasks/:id hoặc /tasks/:taskId/comments)
@@ -51,6 +52,11 @@ async function resolveProjectId(req) {
     return { projectId: comment.task.projectId };
   }
 
+  // 4. Cuối cùng mới dùng body (chỉ khi URL không có mã nào, VD: POST /tasks để tạo mới)
+  if (req.body?.projectId !== undefined) {
+    return { projectId: Number(req.body.projectId) };
+  }
+
   return { error: "Thiếu mã dự án!", status: 400 };
 }
 
@@ -60,7 +66,8 @@ async function resolveProjectId(req) {
  */
 export async function requireProjectMember(req, res, next) {
   try {
-    // Hỗ trợ cả req.user.id lẫn req.user.userId tùy cách bên Auth gán
+    // Hỗ trợ cả req.user.id lẫn req.user.userId tùy cách bên Auth gán.
+    // TODO: bỏ nhánh req.headers["x-user-id"] khi đã có requireAuth thật (chỉ đọc req.user).
     const userId = Number(req.user?.id ?? req.user?.userId ?? req.headers["x-user-id"]);
     if (!Number.isInteger(userId) || userId <= 0) {
       return res.status(401).json({ error: "Vui lòng đăng nhập để tiếp tục!" });
@@ -112,7 +119,9 @@ export async function requireProjectMember(req, res, next) {
 export async function requireLeader(req, res, next) {
   try {
     if (!req.projectMember) {
-      return requireProjectMember(req, res, () => {
+      return requireProjectMember(req, res, (err) => {
+        // Lỗi hệ thống (VD: mất kết nối DB) phải chuyển tiếp, không được trả 403
+        if (err) return next(err);
         if (req.projectMember?.role !== "LEADER") {
           return res
             .status(403)
