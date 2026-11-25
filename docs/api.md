@@ -15,7 +15,6 @@
   }
   ```
   | Mã HTTP | Ý nghĩa | Ví dụ thông báo |
-  |---|---|---|
   | `400` | Dữ liệu đầu vào không hợp lệ / thiếu trường | `{"error": "Tên dự án không được để trống!"}` |
   | `401` | Chưa đăng nhập hoặc token hết hạn | `{"error": "Phiên đăng nhập không hợp lệ hoặc đã hết hạn!"}` |
   | `403` | Không đủ quyền (ví dụ MEMBER thực hiện lệnh của LEADER) | `{"error": "Chỉ trưởng nhóm (LEADER) mới có quyền thực hiện thao tác này!"}` |
@@ -157,7 +156,6 @@
     }
   }
   ```
-
 ### Cập nhật thông tin dự án (`PUT /api/projects/:id`)
 - Quyền hạn: Yêu cầu đăng nhập (`requireAuth`), là thành viên dự án (`requireProjectMember`) và phải là Trưởng nhóm (`requireLeader`).
 - Request Body (truyền các trường cần sửa; truyền `deadline: null` nếu muốn xóa thời hạn):
@@ -233,7 +231,6 @@
   - `401`: `{"error": "Vui lòng đăng nhập để tiếp tục!"}`
   - `403`: `{"error": "Chỉ trưởng nhóm (LEADER) mới có quyền thực hiện thao tác này!"}`
   - `404`: `{"error": "Thành viên không thuộc dự án này!"}` hoặc `{"error": "Không tìm thấy dự án!"}`
-
 ### Chuyển quyền trưởng nhóm (`PATCH /api/projects/:id/transfer-leader`)
 - Quyền hạn: Yêu cầu đăng nhập (`requireAuth`), là thành viên dự án (`requireProjectMember`) và phải là Trưởng nhóm (`requireLeader`).
 - Request Body:
@@ -266,9 +263,7 @@
   - `400`: `{"error": "Trưởng nhóm không thể rời dự án khi chưa chuyển quyền cho thành viên khác!"}`
   - `401`: `{"error": "Vui lòng đăng nhập để tiếp tục!"}`
   - `403`: `{"error": "Bạn không phải là thành viên của dự án này!"}`
-
 ---
-
 ## 4. Công việc (`Task`)
 - Trạng thái (`status`): `"TODO"` | `"IN_PROGRESS"` | `"DONE"`
 - Độ ưu tiên (`priority`): `"LOW"` | `"MEDIUM"` | `"HIGH"`
@@ -306,47 +301,12 @@
       "assigneeId": 2,
       "parentId": 10,
       "createdAt": "2026-11-22T16:10:00.000Z",
-      "updatedAt": "2026-11-22T16:10:00.000Z",
-      "assignee": { "id": 2, "name": "Trần Văn B", "email": "vanb@example.com", "avatarUrl": null }
+      "updatedAt": "2026-11-22T16:10:00.000Z"
     }
   ],
   "subtaskProgress": { "done": 0, "total": 1 }
 }
 ```
-
-### Danh sách API công việc
-
-Tạm thời gửi header `X-User-Id: <id>` thay cho `Authorization` cho đến khi có đăng nhập thật.
-
-| Phương thức | Đường dẫn | Quyền | Mô tả |
-|---|---|---|---|
-| GET | `/api/projects/:projectId/tasks` | Thành viên dự án | Danh sách công việc chính (kèm `subtasks`, `subtaskProgress`), mới nhất trước |
-| POST | `/api/tasks` | `LEADER` | Tạo công việc, trả `201` kèm Task |
-| GET | `/api/tasks/:id` | Thành viên dự án | Chi tiết một công việc |
-| PATCH | `/api/tasks/:id` | `LEADER`: mọi trường; `MEMBER`: chỉ `status` của việc được giao cho mình | Sửa công việc, trả Task |
-| DELETE | `/api/tasks/:id` | `LEADER` | Xóa kèm công việc con và bình luận, trả `{ "message": "Đã xóa công việc." }` |
-| POST | `/api/tasks/:id/subtasks` | `LEADER` | Tạo công việc con (chỉ 1 cấp), trả `201` kèm Task con (không có `subtasks`) |
-
-Dữ liệu gửi lên khi tạo hoặc sửa (khi sửa chỉ cần gửi trường muốn đổi):
-
-```json
-{
-  "projectId": 1,
-  "title": "Thiết kế trang đăng nhập",
-  "description": null,
-  "assigneeId": 2,
-  "dueDate": "2026-11-28",
-  "priority": "HIGH",
-  "status": "TODO"
-}
-```
-
-- `title`: bắt buộc khi tạo, tối đa 200 ký tự.
-- `assigneeId`: phải là thành viên của dự án, hoặc `null` nếu chưa giao.
-- `dueDate`: `"YYYY-MM-DD"` hoặc ISO 8601, `null` nếu không đặt.
-- Công việc cha có thêm `"subtaskProgress": { "done": 1, "total": 3 }`; mỗi công việc con trong `subtasks` có thêm `assignee`.
-- Lỗi: `400` dữ liệu sai, `401` chưa đăng nhập, `403` không đủ quyền, `404` không tìm thấy.
-
 ---
 
 ## 5. Thông báo (`Notification`)
@@ -377,12 +337,10 @@ Dữ liệu gửi lên khi tạo hoặc sửa (khi sửa chỉ cần gửi trư�
   }
 ]
 ```
-
 ---
 
 ## 6. Middleware phân quyền dự án dùng chung
 *File khai báo:* `server/src/middleware/projectAuth.js`
-
 Gồm 2 hàm kiểm tra quyền theo từng dự án (`requireProjectMember` và `requireLeader`). **Lưu ý:** Luôn đặt sau middleware xác thực đăng nhập (`requireAuth`) để có sẵn `req.user`. Trong lúc chưa có `requireAuth`, middleware tạm đọc header `X-User-Id`.
 
 ### Cách hoạt động
@@ -396,7 +354,6 @@ Gồm 2 hàm kiểm tra quyền theo từng dự án (`requireProjectMember` và
   Sau khi kiểm tra hợp lệ, middleware gắn sẵn `req.project` và `req.projectMember` để controller phía sau dùng lại.
 
 **`requireLeader`**: Kiểm tra vai trò của thành viên trong dự án phải là `"LEADER"`. Nếu thiếu quyền sẽ trả về mã `403` kèm `{ "error": "Chỉ trưởng nhóm (LEADER) mới có quyền thực hiện thao tác này!" }`.
-
 ### Ví dụ áp dụng trong các file Route
 ```javascript
 import { requireProjectMember, requireLeader } from "../middleware/projectAuth.js";
@@ -410,4 +367,3 @@ router.post("/tasks/:taskId/comments", requireAuth, requireProjectMember, ...);
 // 2. Thao tác chỉ dành cho Trưởng nhóm (LEADER)
 router.put("/projects/:id", requireAuth, requireProjectMember, requireLeader, ...);
 router.delete("/projects/:id", requireAuth, requireProjectMember, requireLeader, ...);
-```
