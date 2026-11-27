@@ -24,5 +24,11 @@
   },
   "engines": {
     "node": ">=18.11"
+  },
+  "overrides": {
+    "@prisma/config": {
+      "effect": "3.22.5",
+      "deepmerge-ts": "8.0.2"
+    }
   }
 }

@@ -1,6 +1,7 @@
 # Đặc tả định dạng JSON API - TaskFlow
 
 ## 1. Quy ước chung
+> **Trạng thái triển khai:** Tài liệu bao gồm cả API đã triển khai và đặc tả API dự kiến của nhóm. Các chức năng quản lý dự án nâng cao, giao việc, thời hạn công việc, công việc con, bình luận và thông báo cần tiếp tục hoàn thiện theo phân công. API tạo dự án và tạo công việc hiện trả HTTP 200; mã HTTP 201 là đặc tả mục tiêu.
 - **Base URL:** `http://localhost:5000/api`
 - **Xác thực (Authentication):** Các API yêu cầu đăng nhập gửi kèm header:
   ```http
@@ -361,7 +362,7 @@ Dữ liệu đăng ký / đăng nhập:
 
 ### Danh sách API công việc
 
-Tạm thời gửi header `X-User-Id: <id>` thay cho `Authorization` cho đến khi có đăng nhập thật.
+Tất cả API công việc yêu cầu xác thực JWT qua header `Authorization: Bearer <token>`. Không hỗ trợ xác thực bằng ID người dùng do client cung cấp.
 
 | Phương thức | Đường dẫn | Quyền | Mô tả |
 |---|---|---|---|
@@ -428,7 +429,7 @@ Dữ liệu gửi lên khi tạo hoặc sửa (khi sửa chỉ cần gửi trư�
 ## 6. Middleware phân quyền dự án dùng chung
 *File khai báo:* `server/src/middleware/projectAuth.js`
 
-Gồm 2 hàm kiểm tra quyền theo từng dự án (`requireProjectMember` và `requireLeader`). **Lưu ý:** Luôn đặt sau middleware xác thực đăng nhập (`requireAuth`) để có sẵn `req.user`. Trong lúc chưa có `requireAuth`, middleware tạm đọc header `X-User-Id`.
+Gồm 2 hàm kiểm tra quyền theo từng dự án (`requireProjectMember` và `requireLeader`). **Lưu ý:** Luôn đặt sau middleware xác thực đăng nhập (`requireAuth`) để có sẵn `req.user`. Middleware xác định người dùng từ `req.user.id` sau khi JWT đã được xác thực.
 
 ### Cách hoạt động
 **`requireProjectMember`**: Kiểm tra người dùng hiện tại có nằm trong bảng `ProjectMember` của dự án hay không (`LEADER` hoặc `MEMBER`). Hàm tự động tìm `projectId` theo thứ tự ưu tiên sau (mã trên URL luôn thắng `req.body`):
@@ -448,11 +449,90 @@ import { requireProjectMember, requireLeader } from "../middleware/projectAuth.j
 
 // 1. Thao tác dành cho mọi thành viên dự án (LEADER & MEMBER)
 router.get("/projects/:projectId/tasks", requireAuth, requireProjectMember, ...);
-router.post("/tasks", requireAuth, requireProjectMember, ...);
+
 router.patch("/tasks/:id", requireAuth, requireProjectMember, ...);
 router.post("/tasks/:taskId/comments", requireAuth, requireProjectMember, ...);
 
 // 2. Thao tác chỉ dành cho Trưởng nhóm (LEADER)
 router.put("/projects/:id", requireAuth, requireProjectMember, requireLeader, ...);
 router.delete("/projects/:id", requireAuth, requireProjectMember, requireLeader, ...);
+router.post("/tasks", requireAuth, requireLeader, ...);
+```
+
+
+---
+
+## Thống kê (`/api/stats`) — Người 2
+
+*Tất cả API yêu cầu đăng nhập. Quy ước: chỉ tính **công việc chính** (không tính công việc con); "quá hạn" = có hạn đã qua và chưa hoàn thành.*
+
+### Bảng điều khiển (`GET /api/stats/dashboard`)
+Tổng hợp trong các dự án mà người dùng tham gia.
+```json
+{ "total": 14, "todo": 4, "inProgress": 5, "done": 5, "overdue": 2 }
+```
+
+### Dự án gần đây (`GET /api/stats/recent-projects`)
+Tối đa 5 dự án mới cập nhật gần nhất.
+```json
+[
+  {
+    "id": 1,
+    "name": "Ứng dụng quản lý tác vụ TaskFlow",
+    "description": null,
+    "deadline": "2026-12-15T23:59:59.000Z",
+    "updatedAt": "2026-11-25T08:00:00.000Z",
+    "role": "LEADER",
+    "taskCount": 10,
+    "doneCount": 4,
+    "overdueCount": 2,
+    "completionPercent": 40
+  }
+]
+```
+
+### Việc sắp đến hạn (`GET /api/stats/upcoming-tasks`)
+Việc chưa hoàn thành có hạn trong 48 giờ tới, sắp xếp theo hạn tăng dần (tối đa 20).
+```json
+[
+  {
+    "id": 7,
+    "title": "Nộp báo cáo tuần 3",
+    "status": "IN_PROGRESS",
+    "priority": "HIGH",
+    "dueDate": "2026-11-26T09:00:00.000Z",
+    "project": { "id": 1, "name": "Ứng dụng quản lý tác vụ TaskFlow" },
+    "assignee": { "id": 2, "name": "Trần Văn B" }
+  }
+]
+```
+
+### Thống kê một dự án (`GET /api/stats/projects/:projectId`)
+- Quyền: thành viên dự án (`403` nếu không phải thành viên, `404` nếu không có dự án).
+```json
+{
+  "project": { "id": 1, "name": "Ứng dụng quản lý tác vụ TaskFlow", "deadline": null },
+  "myRole": "LEADER",
+  "total": 10,
+  "byStatus": { "TODO": 3, "IN_PROGRESS": 3, "DONE": 4 },
+  "completionPercent": 40,
+  "overdue": 2
+}
+```
+
+### Tiến độ từng thành viên (`GET /api/stats/projects/:projectId/members`)
+- Quyền: **chỉ trưởng nhóm** (`403` với thành viên thường). Tính theo công việc chính được giao cho từng người.
+```json
+[
+  {
+    "user": { "id": 1, "name": "Nguyễn Thị Anh Thư", "email": "anhthu@example.com", "avatarUrl": null },
+    "role": "LEADER",
+    "total": 4,
+    "todo": 1,
+    "inProgress": 1,
+    "done": 2,
+    "overdue": 1,
+    "completionPercent": 50
+  }
+]
 ```
