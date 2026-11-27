@@ -75,4 +75,3 @@ export default function AuthLayout({ title, subtitle, children, footer }) {
     </div>
   );
 }
-
