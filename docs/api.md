@@ -320,12 +320,45 @@ Tạm thời gửi header `X-User-Id: <id>` thay cho `Authorization` cho đến 
 
 | Phương thức | Đường dẫn | Quyền | Mô tả |
 |---|---|---|---|
-| GET | `/api/projects/:projectId/tasks` | Thành viên dự án | Danh sách công việc chính (kèm `subtasks`, `subtaskProgress`), mới nhất trước. Query tùy chọn: `q` (tìm theo tiêu đề, không phân biệt hoa thường, tối đa 200 ký tự; sai kiểu hoặc quá dài trả `400`) |
+| GET | `/api/projects/:projectId/tasks` | Thành viên dự án | Danh sách công việc chính (kèm `subtasks`, `subtaskProgress`). Hỗ trợ tìm kiếm, lọc, sắp xếp, phân trang, xem mục "Query của danh sách công việc" bên dưới. Mặc định mới nhất trước, 50 việc mỗi trang |
 | POST | `/api/tasks` | `LEADER` | Tạo công việc, trả `201` kèm Task |
 | GET | `/api/tasks/:id` | Thành viên dự án | Chi tiết một công việc |
 | PATCH | `/api/tasks/:id` | `LEADER`: mọi trường; `MEMBER`: chỉ `status` của việc được giao cho mình | Sửa công việc, trả Task |
 | DELETE | `/api/tasks/:id` | `LEADER` | Xóa kèm công việc con và bình luận, trả `{ "message": "Đã xóa công việc." }` |
 | POST | `/api/tasks/:id/subtasks` | `LEADER` | Tạo công việc con (chỉ 1 cấp), trả `201` kèm Task con (không có `subtasks`) |
+
+### Query của danh sách công việc (`GET /api/projects/:projectId/tasks`)
+
+Tất cả query đều tùy chọn và kết hợp được với nhau. Sai giá trị trả `400` kèm `{ "error": "..." }`. Bộ lọc chỉ áp dụng cho công việc chính; `subtasks` trong mỗi công việc vẫn trả đầy đủ.
+
+| Query | Giá trị | Ý nghĩa |
+|---|---|---|
+| `q` | chuỗi, tối đa 200 ký tự | Tìm theo tiêu đề, không phân biệt hoa thường |
+| `status` | `TODO` \| `IN_PROGRESS` \| `DONE`; nhiều giá trị cách nhau dấu phẩy | Lọc theo trạng thái |
+| `priority` | `LOW` \| `MEDIUM` \| `HIGH`; nhiều giá trị cách nhau dấu phẩy | Lọc theo mức ưu tiên |
+| `assigneeId` | số nguyên dương, hoặc `unassigned` | Lọc theo người thực hiện; `unassigned` là chưa giao cho ai |
+| `due` | `overdue` \| `today` \| `next7days` \| `none` | Lọc nhanh theo thời hạn: quá hạn (đã qua hạn và chưa `DONE`), hạn hôm nay (giờ Việt Nam), hạn trong 7 ngày tới, chưa đặt thời hạn |
+| `dueFrom`, `dueTo` | `YYYY-MM-DD` hoặc ISO 8601 | Lọc thời hạn trong khoảng; `dueTo` dạng chỉ ngày thì tính hết ngày đó; `dueFrom` phải trước `dueTo` |
+| `sortBy` | `createdAt` (mặc định) \| `dueDate` \| `priority` | Trường sắp xếp |
+| `order` | `desc` (mặc định) \| `asc` | Chiều sắp xếp. Với `dueDate`, việc không có thời hạn luôn xếp cuối; với `priority`, `desc` ra `HIGH` trước |
+| `page` | số nguyên dương, mặc định `1` | Trang cần lấy |
+| `limit` | số nguyên dương, mặc định `50`, tối đa `100` | Số công việc mỗi trang |
+
+**Phân trang:** Body phản hồi vẫn là **mảng Task** (không đổi định dạng). Thông tin phân trang nằm ở header:
+
+| Header | Ý nghĩa |
+|---|---|
+| `X-Total-Count` | Tổng số công việc chính khớp bộ lọc (không tính trang) |
+| `X-Page` | Trang hiện tại |
+| `X-Limit` | Số công việc mỗi trang |
+| `X-Total-Pages` | Tổng số trang (tối thiểu 1) |
+
+Ví dụ: `GET /api/projects/1/tasks?status=TODO,IN_PROGRESS&priority=HIGH&sortBy=dueDate&order=asc&page=1&limit=20`
+
+Lỗi mẫu:
+```json
+{ "error": "Trạng thái lọc không hợp lệ!" }
+```
 
 Dữ liệu gửi lên khi tạo hoặc sửa (khi sửa chỉ cần gửi trường muốn đổi):
 

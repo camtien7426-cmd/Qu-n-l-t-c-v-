@@ -1,4 +1,6 @@
-import React, { useState, useEffect } from 'react';
+
+import React, { useState, useEffect, useCallback } from 'react';
+import TaskSearchList from './features/tasks/TaskSearchList.jsx';
 
 const STATUS_LABEL = {
   TODO: 'Chưa thực hiện',
@@ -47,15 +49,64 @@ function App() {
   };
 
   const fetchTasks = async (projId) => {
-    if (!projId) return;
+    if (!projId) {
+      setTasks([]);
+      return;
+    }
+
     try {
       const res = await fetch(`http://localhost:5000/api/projects/${projId}/tasks`);
       const data = await res.json();
-      setTasks(Array.isArray(data) ? data : []);
+      setTasks(
+        Array.isArray(data)
+          ? data
+          : Array.isArray(data.tasks)
+          ? data.tasks
+          : []
+      );
     } catch (err) {
       console.error(err);
+      setTasks([]);
     }
   };
+
+  // Tải danh sách công việc và bộ lọc cho TaskSearchList
+  const loadTasks = useCallback(async (projectId, params = {}) => {
+    if (!projectId) return [];
+
+    try {
+      const query = new URLSearchParams();
+
+      Object.entries(params).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== '') {
+          query.append(key, value);
+        }
+      });
+
+      const queryString = query.toString();
+      const url = `http://localhost:5000/api/projects/${projectId}/tasks${
+        queryString ? `?${queryString}` : ''
+      }`;
+
+      const res = await fetch(url);
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || 'Không thể tải danh sách công việc');
+      }
+
+      const list = Array.isArray(data)
+        ? data
+        : Array.isArray(data.tasks)
+        ? data.tasks
+        : [];
+
+      return list;
+    } catch (err) {
+      console.error('Lỗi tải công việc:', err);
+      throw err;
+    }
+  }, []);
 
   useEffect(() => {
     if (tab === 'projects' || tab === 'tasks') {
@@ -312,40 +363,14 @@ function App() {
               <button type="submit" className="bg-blue-600 text-white px-5 py-2 rounded hover:bg-blue-700">Thêm Task</button>
             </form>
 
-            <h3 className="text-lg font-semibold mb-3">Danh sách Công việc:</h3>
-            <div className="space-y-2">
-              {tasks.length === 0 && <p className="text-gray-500">Dự án này chưa có công việc nào.</p>}
-              {tasks.map((t) => (
-                <div key={t.id} className="border p-3 rounded flex justify-between items-center bg-white">
-                  <div className="flex-1">
-                    <span className="font-medium text-gray-800">{t.title}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <select
-                      value={t.status}
-                      onChange={(e) => handleChangeStatus(t.id, e.target.value)}
-                      className="border p-1 rounded text-xs bg-white"
-                    >
-                      {Object.entries(STATUS_LABEL).map(([value, label]) => (
-                        <option key={value} value={value}>{label}</option>
-                      ))}
-                    </select>
-                    <span className={`text-xs font-semibold px-2 py-1 rounded ${
-                      t.priority === 'HIGH' ? 'bg-red-100 text-red-700' :
-                      t.priority === 'MEDIUM' ? 'bg-yellow-100 text-yellow-700' : 'bg-green-100 text-green-700'
-                    }`}>
-                      {t.priority}
-                    </span>
-                    <button
-                      onClick={() => handleDeleteTask(t.id)}
-                      className="text-xs bg-red-100 text-red-700 px-3 py-1 rounded hover:bg-red-200 font-medium"
-                    >
-                      Xóa
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
+            <TaskSearchList
+              projectId={selectedProjectId}
+              loadTasks={loadTasks}
+              members={[]}
+              currentUser={null}
+              role="LEADER"
+              changeTaskStatus={handleChangeStatus}
+            />
           </div>
         )}
       </div>

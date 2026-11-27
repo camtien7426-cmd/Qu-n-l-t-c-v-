@@ -1,6 +1,6 @@
 import express from 'express';
 import { prisma } from '../lib/prisma.js';
-import { buildTaskListQuery } from '../utils/taskQuery.js';
+import { buildTaskListQuery, setPaginationHeaders } from '../utils/taskQuery.js';
 import { requireProjectMember } from '../middleware/projectAuth.js';
 
 const router = express.Router();
@@ -8,19 +8,30 @@ const router = express.Router();
 const VALID_STATUS = ['TODO', 'IN_PROGRESS', 'DONE'];
 const VALID_PRIORITY = ['LOW', 'MEDIUM', 'HIGH'];
 
-// 4. API Lấy danh sách công việc của dự án (có thể tìm theo tiêu đề: ?q=...)
+// 4. API Lấy danh sách công việc của dự án
+// Query tùy chọn: q (tìm theo tiêu đề), status, priority, assigneeId, due, dueFrom, dueTo,
+// sortBy, order, page, limit. Body vẫn là mảng Task; tổng số/trang nằm ở header X-Total-Count...
 router.get('/projects/:projectId/tasks', requireProjectMember, async (req, res) => {
   try {
     const projectId = parseInt(req.params.projectId);
 
-    const { where, error } = buildTaskListQuery(req.query);
+    const { where, orderBy, skip, take, pagination, error } = buildTaskListQuery(req.query);
     if (error) return res.status(400).json({ error });
 
-    const tasks = await prisma.task.findMany({
-      where: { projectId, parentId: null, ...where },
-      include: { subtasks: true, assignee: true },
-      orderBy: { createdAt: 'desc' },
-    });
+    const finalWhere = { projectId, parentId: null, ...where };
+
+    const [tasks, total] = await Promise.all([
+      prisma.task.findMany({
+        where: finalWhere,
+        include: { subtasks: true, assignee: true },
+        orderBy,
+        skip,
+        take,
+      }),
+      prisma.task.count({ where: finalWhere }),
+    ]);
+
+    setPaginationHeaders(res, pagination, total);
     res.json(tasks);
   } catch (error) {
     res.status(500).json({ error: error.message });
