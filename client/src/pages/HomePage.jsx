@@ -6,6 +6,7 @@ import { FolderIcon, PlusIcon } from "../components/Icons.jsx";
 import { LoadingBlock } from "../components/Spinner.jsx";
 import { api } from "../api.js";
 import { useAuth } from "../context/AuthContext.jsx";
+import { PROJECTS_CHANGED_EVENT } from "../components/AppLayout.jsx";
 
 // Danh sách dự án có thể đến từ API bản cũ (members + _count) hoặc bản mới (role, taskCount...)
 function normalizeProject(p, userId) {
@@ -84,6 +85,7 @@ export default function HomePage() {
       setName("");
       setDescription("");
       setShowForm(false);
+      window.dispatchEvent(new Event(PROJECTS_CHANGED_EVENT));
       await loadProjects();
     } catch (err) {
       setFormError(err.message);
