@@ -85,9 +85,11 @@ npm install
 3. Cấu hình biến môi trường (.env)
 Tạo một file mới tên là .env nằm bên trong thư mục server/ (server/.env).
 
-    Dán nội dung sau vào file và thay mat_khau_cua_ban bằng mật khẩu tài khoản postgres trên máy của bạn:
+    Dán nội dung sau vào file, thay mat_khau_cua_ban bằng mật khẩu tài khoản postgres trên máy bạn, và đổi JWT_SECRET thành một chuỗi bí mật riêng (có thể copy từ server/.env.example):
 
 DATABASE_URL="postgresql://postgres:mat_khau_cua_ban@localhost:5432/taskflow?schema=public"
+JWT_SECRET="doi-chuoi-bi-mat-nay-thanh-chuoi-ngau-nhien-dai"
+JWT_EXPIRES_IN="1d"
 
 4. Khởi tạo Database (Prisma)
 Tại Terminal của thư mục server/, chạy lệnh sau để đồng bộ cấu trúc bảng vào PostgreSQL:

@@ -57,6 +57,51 @@
 
 ---
 
+## 2b. Xác thực và hồ sơ (`/api/auth`)
+Mật khẩu được băm bằng `bcryptjs` (cost 10). Token JWT sống 1 ngày (`JWT_EXPIRES_IN`), trình duyệt lưu ở `localStorage` và gửi qua header `Authorization: Bearer <token>`.
+
+| Phương thức | Đường dẫn | Cần đăng nhập | Mô tả |
+|---|---|---|---|
+| POST | `/api/auth/register` | Không | Đăng ký, trả `201` kèm `{ token, user }` |
+| POST | `/api/auth/login` | Không | Đăng nhập, trả `{ token, user }` |
+| POST | `/api/auth/logout` | Không | Trả `{ "message": "Đã đăng xuất!" }`; trình duyệt tự xóa token |
+| GET | `/api/auth/me` | Có | Trả `{ user }` của người đang đăng nhập |
+| PATCH | `/api/auth/me` | Có | Sửa họ tên, gửi `{ "name": "..." }`, trả `{ message, user }` |
+| POST | `/api/auth/change-password` | Có | Đổi mật khẩu, gửi `{ currentPassword, newPassword }` |
+| POST | `/api/auth/avatar` | Có | Tải ảnh đại diện (`multipart/form-data`, trường `avatar`) |
+| DELETE | `/api/auth/avatar` | Có | Xóa ảnh đại diện, trả `{ message, user }` |
+| POST | `/api/auth/forgot-password` | Không | Tạo liên kết đặt lại mật khẩu, gửi `{ "email": "..." }` |
+| POST | `/api/auth/reset-password` | Không | Đặt mật khẩu mới, gửi `{ "token": "...", "password": "..." }` |
+
+Dữ liệu đăng ký / đăng nhập:
+
+```json
+{ "name": "Nguyễn Thị Cẩm Tiên", "email": "tien@example.com", "password": "matkhau123" }
+```
+
+- `name`: 2 đến 100 ký tự. `email`: đúng định dạng, không phân biệt hoa thường. `password`: 6 đến 72 ký tự.
+- Đăng nhập sai email hoặc mật khẩu đều trả cùng một thông báo `401`; sai quá 10 lần trong 15 phút trả `429`.
+
+**Ảnh đại diện:** chỉ nhận JPG, PNG, WebP (kiểm tra nội dung thật của file), tối đa 2 MB. File lưu ở `server/uploads`, `avatarUrl` có dạng `/uploads/avatar-<userId>-<thời gian>.png`. Tải ảnh mới thì ảnh cũ bị xóa. Chưa có ảnh (`avatarUrl = null`) thì giao diện hiện chữ cái đầu của tên.
+
+**Đặt lại mật khẩu:**
+- `forgot-password` luôn trả cùng một thông báo dù email có tồn tại hay không.
+- Token ngẫu nhiên 32 byte, database chỉ lưu bản băm SHA-256 (`resetTokenHash`), hạn 15 phút (`resetTokenExpires`), dùng một lần.
+- Ở môi trường dev (`NODE_ENV=development`) liên kết được in ra console của server và trả thêm trường `devResetLink`:
+
+```json
+{
+  "message": "Nếu email đã đăng ký, liên kết đặt lại mật khẩu đã được tạo. Liên kết có hiệu lực trong 15 phút.",
+  "devResetLink": "http://localhost:5173/reset-password?token=..."
+}
+```
+
+- Lỗi: `400` dữ liệu sai hoặc token hết hạn / đã dùng, `401` sai thông tin đăng nhập hoặc chưa đăng nhập, `409` email đã đăng ký, `429` thử quá nhiều lần.
+
+**Bảo vệ API:** middleware `requireAuth` chặn mọi đường dẫn `/api/projects`, `/api/tasks`, `/api/comments`, `/api/notifications`, `/api/stats`. Chưa gửi token trả `401`; token sai hoặc hết hạn trả `401` kèm `"Phiên đăng nhập không hợp lệ hoặc đã hết hạn!"`. Sau middleware, `req.user` chứa `{ id, name, email, avatarUrl, createdAt, updatedAt }`.
+
+---
+
 ## 3. Dự án (`Project` & `ProjectMember`)
 *Giá trị `role` trong dự án: `"LEADER"` | `"MEMBER"` (mỗi dự án chỉ có 1 `LEADER`).*
 
