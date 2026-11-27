@@ -66,9 +66,7 @@ async function resolveProjectId(req) {
  */
 export async function requireProjectMember(req, res, next) {
   try {
-    // Hỗ trợ cả req.user.id lẫn req.user.userId tùy cách bên Auth gán.
-    // TODO: bỏ nhánh req.headers["x-user-id"] khi đã có requireAuth thật (chỉ đọc req.user).
-    const userId = Number(req.user?.id ?? req.user?.userId ?? req.headers["x-user-id"]);
+    const userId = Number(req.user?.id);
     if (!Number.isInteger(userId) || userId <= 0) {
       return res.status(401).json({ error: "Vui lòng đăng nhập để tiếp tục!" });
     }

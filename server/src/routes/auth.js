@@ -194,22 +194,36 @@ router.post(
     });
     if (!user) throw invalid;
 
-    // Đổi mật khẩu và xóa token trong cùng một lệnh: dùng được đúng một lần
-    await prisma.user.update({
-      where: { id: user.id },
+    // Đổi mật khẩu và vô hiệu hóa token trong cùng một thao tác
+    const passwordHash = await hashPassword(password);
+
+    const result = await prisma.user.updateMany({
+      where: {
+        id: user.id,
+        resetTokenHash: user.resetTokenHash,
+        resetTokenExpires: {
+          gt: new Date(),
+        },
+      },
       data: {
-        passwordHash: await hashPassword(password),
+        passwordHash,
         resetTokenHash: null,
         resetTokenExpires: null,
       },
     });
 
-    res.json({ message: "Đặt lại mật khẩu thành công! Hãy đăng nhập bằng mật khẩu mới." });
+    if (result.count !== 1) {
+      throw invalid;
+    }
+
+    res.json({
+      message: "Đặt lại mật khẩu thành công! Hãy đăng nhập bằng mật khẩu mới.",
+    });
   })
 );
 
 /* ------------------------------------------------------------------ */
-/* Hồ sơ cá nhân (cần đăng nhập)                                       */
+/* Hồ sơ cá nhân (cần đăng nhập)                                      */
 /* ------------------------------------------------------------------ */
 
 // GET /api/auth/me
@@ -231,6 +245,8 @@ router.patch(
     res.json({ message: "Đã cập nhật hồ sơ!", user });
   })
 );
+
+
 
 // POST /api/auth/change-password  { currentPassword, newPassword }
 router.post(
